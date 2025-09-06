@@ -1,0 +1,3 @@
+#ifndef WOLFGUARD_VERSION
+#define WOLFGUARD_VERSION "1.0.20250905"
+#endif

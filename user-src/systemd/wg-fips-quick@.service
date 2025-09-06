@@ -1,0 +1,19 @@
+[Unit]
+Description=WolfGuard via wg-fips-quick(8) for %I
+After=network-online.target nss-lookup.target
+Wants=network-online.target nss-lookup.target
+PartOf=wg-fips-quick.target
+Documentation=man:wg-fips-quick(8)
+Documentation=man:wg-fips(8)
+Documentation=https://www.wolfssl.com/wolfguard/
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/wg-fips-quick up %i
+ExecStop=/usr/bin/wg-fips-quick down %i
+ExecReload=/bin/bash -c 'exec /usr/bin/wg-fips syncconf %i <(exec /usr/bin/wg-fips-quick strip %i)'
+Environment=WG_ENDPOINT_RESOLUTION_RETRIES=infinity
+
+[Install]
+WantedBy=multi-user.target

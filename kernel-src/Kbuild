@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+#
+# Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+
+ccflags-y := -O3
+ccflags-$(CONFIG_WOLFGUARD_DEBUG) += -DDEBUG -g
+ccflags-y += -D'pr_fmt(fmt)=KBUILD_MODNAME ": " fmt'
+ccflags-y += -Wframe-larger-than=2048
+# use dwarf 4 to avoid "Unsupported DW_TAG_atomic_type(0x47): type: 0x1ce18" on older kernels.
+ccflags-y += -gdwarf-4
+ccflags-$(if $(WOLFGUARD_VERSION),y,) += -D'WOLFGUARD_VERSION="$(WOLFGUARD_VERSION)"'
+
+wolfguard-y := main.o noise.o device.o peer.o timers.o queueing.o send.o receive.o socket.o peerlookup.o allowedips.o ratelimiter.o cookie.o netlink.o
+
+include $(src)/compat/Kbuild.include
+
+obj-$(if $(KBUILD_EXTMOD),m,$(CONFIG_WOLFGUARD)) := wolfguard.o
+
+ifndef WOLFSSL_ROOT
+WOLFSSL_ROOT = $(src)/../../wolfssl
+endif
+ccflags-y += -I$(shell $(CC) -print-file-name=include) -I$(WOLFSSL_ROOT)/linuxkm/build/include
+wolfguard-y += wolfcrypt_glue.o
+KBUILD_EXTRA_SYMBOLS := $(WOLFSSL_ROOT)/linuxkm/Module.symvers

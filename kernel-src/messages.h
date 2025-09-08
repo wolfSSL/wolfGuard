@@ -65,7 +65,7 @@ enum message_type {
 	MESSAGE_DATA = 4
 };
 
-struct message_header {
+struct __attribute__((packed)) message_header {
 	/* The actual layout of this that we want is:
 	 * u8 type
 	 * u8 reserved_zero[3]
@@ -76,12 +76,12 @@ struct message_header {
 	__le32 type;
 };
 
-struct message_macs {
+struct __attribute__((packed)) message_macs {
 	u8 mac1[COOKIE_LEN];
 	u8 mac2[COOKIE_LEN];
 };
 
-struct message_handshake_initiation {
+struct __attribute__((packed)) message_handshake_initiation {
 	struct message_header header;
 	__le32 sender_index;
 	u8 unencrypted_ephemeral[NOISE_PUBLIC_KEY_LEN];
@@ -90,7 +90,7 @@ struct message_handshake_initiation {
 	struct message_macs macs;
 };
 
-struct message_handshake_response {
+struct __attribute__((packed)) message_handshake_response {
 	struct message_header header;
 	__le32 sender_index;
 	__le32 receiver_index;
@@ -99,14 +99,14 @@ struct message_handshake_response {
 	struct message_macs macs;
 };
 
-struct message_handshake_cookie {
+struct __attribute__((packed)) message_handshake_cookie {
 	struct message_header header;
 	__le32 receiver_index;
 	u8 nonce[COOKIE_NONCE_LEN];
 	u8 encrypted_cookie[noise_encrypted_len(COOKIE_LEN)];
 };
 
-struct message_data {
+struct __attribute__((packed)) message_data {
 	struct message_header header;
 	__le32 key_idx;
 	__le64 counter;

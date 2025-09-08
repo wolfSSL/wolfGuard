@@ -44,13 +44,13 @@ int __init wg_noise_init(void)
 		return -EINVAL;
 	}
 
-	ret = wc_Sha256Update(&sha, handshake_name, (word32)sizeof(handshake_name));
+	ret = wc_Sha256Update(&sha, handshake_name, (word32)strlen(handshake_name));
 	if (ret == 0)
 		ret = wc_Sha256Final(&sha, handshake_init_chaining_key);
 	if (ret == 0)
 		ret = wc_Sha256Update(&sha, handshake_init_chaining_key, NOISE_HASH_LEN);
 	if (ret == 0)
-		ret = wc_Sha256Update(&sha, identifier_name, sizeof(identifier_name));
+		ret = wc_Sha256Update(&sha, identifier_name, (word32)strlen(identifier_name));
 	if (ret == 0)
 		ret = wc_Sha256Final(&sha, handshake_init_hash);
 

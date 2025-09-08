@@ -35,7 +35,7 @@ static int precompute_key(u8 key[NOISE_SYMMETRIC_KEY_LEN],
 			   const u8 pubkey[NOISE_PUBLIC_KEY_LEN],
 			   const u8 label[COOKIE_KEY_LABEL_LEN])
 {
-	return wc_sha256_oneshot2(key, pubkey, NOISE_PUBLIC_KEY_LEN, label, COOKIE_KEY_LABEL_LEN);
+	return wc_sha256_oneshot2(key, label, COOKIE_KEY_LABEL_LEN, pubkey, NOISE_PUBLIC_KEY_LEN);
 }
 
 /* Must hold peer->handshake.static_identity->lock */

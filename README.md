@@ -79,7 +79,7 @@ $ ./wolfcrypt/test/testwolfcrypt
 # make install
 ```
 
-(3) Build and install the `wg-fips` user tool -- note, installtion will move existing
+(3) Build and install the `wg-fips` user tool -- note, installation will move existing
 WireGuard `wg` and `wg-quick` executables and man pages in the destination directories (if
 present) to `wg-wireguard` and `wg-wireguard-quick` respectively, and will
 install symbolic links for `wg` and `wg-quick` that point to the WolfGuard versions.
@@ -149,7 +149,7 @@ are `v5` and `v6`.
 
 ```
 $ cd wolfssl
-$ ./configure --enable-all-crypto --enable-fips=vX
+$ ./configure --enable-fips=vX --enable-all-crypto
 $ make -j
 $ ./fips-hash.sh
 $ make -j
@@ -179,7 +179,7 @@ incorrect integrity hash.  Then you will load it to capture the correct hash
 and load the module with the correct hash.
 ```
 $ cd ../../wolfssl
-$ ./configure --enable-all-crypto --enable-cryptonly \
+$ ./configure --enable-fips=vX --enable-all-crypto --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j

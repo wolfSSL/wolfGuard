@@ -4,6 +4,7 @@
  */
 
 #include <crypto/scatterwalk.h>
+#include <linux/random.h>
 #include "wolfcrypt_glue.h"
 
 int wc_hmac_oneshot_prealloc(struct Hmac *wc_hmac, const int type, byte *out, const size_t out_space, const byte *message,
@@ -719,7 +720,7 @@ int wc_linuxkm_drbg_init_ctx(struct wc_linuxkm_drbg_ctx *ctx)
     int need_reenable_vec;
     int can_sleep = (preempt_count() == 0);
 
-    ctx->n_rngs = max(4, nr_cpu_ids);
+    ctx->n_rngs = max(4, (int)nr_cpu_ids);
     ctx->rngs = (struct wc_rng_inst *)malloc(sizeof(*ctx->rngs) * ctx->n_rngs);
     if (! ctx->rngs) {
         ctx->n_rngs = 0;

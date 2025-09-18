@@ -20,7 +20,7 @@
 
 #ifndef WG_CURVE_ID
     #define WG_CURVE_ID ECC_SECP256R1
-    #define WG_PUBLIC_KEY_LEN 65 /* Size of uncompressed SECP256R1 public key */,
+    #define WG_PUBLIC_KEY_LEN 65 /* Size of uncompressed SECP256R1 public key */
     #define WG_PRIVATE_KEY_LEN 32 /* Size of SECP256R1 private key */
     #define WG_SYMMETRIC_KEY_LEN 32 /* AES_256_KEY_SIZE */
 #endif

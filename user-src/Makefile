@@ -52,6 +52,15 @@ WOLFGUARD_TOOLS_VERSION = $(patsubst v%,%,$(shell GIT_CEILING_DIRECTORIES="$(PWD
 ifneq ($(WOLFGUARD_TOOLS_VERSION),)
 CFLAGS += -D'WOLFGUARD_TOOLS_VERSION="$(WOLFGUARD_TOOLS_VERSION)"'
 endif
+
+ifdef WOLFSSL_ROOT
+CFLAGS += -I$(WOLFSSL_ROOT)/include
+LDLIBS += -L$(WOLFSSL_ROOT)/lib -lwolfssl -Wl,-rpath=$(WOLFSSL_ROOT)/lib
+else
+CFLAGS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --cflags wolfssl)
+LDLIBS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --libs wolfssl)
+endif
+
 ifeq ($(PLATFORM),haiku)
 LDLIBS += -lnetwork -lbsd
 endif
@@ -60,14 +69,6 @@ CC := x86_64-w64-mingw32-gcc
 CFLAGS += -Iwincompat/include -include wincompat/compat.h
 LDLIBS += -lws2_32
 wg-fips: wincompat/libc.o wincompat/init.o
-endif
-
-ifdef WOLFSSL_ROOT
-CFLAGS += -I$(WOLFSSL_ROOT)/include
-LDLIBS += -L$(WOLFSSL_ROOT)/lib -lwolfssl -Wl,-rpath=$(WOLFSSL_ROOT)/lib
-else
-CFLAGS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --cflags wolfssl)
-LDLIBS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --libs wolfssl)
 endif
 
 ifdef EXTRA_CFLAGS

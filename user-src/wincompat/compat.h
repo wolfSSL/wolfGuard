@@ -25,5 +25,7 @@
 char *strsep(char **str, const char *sep);
 ssize_t getdelim(char **buf, size_t *bufsiz, int delimiter, FILE *fp);
 ssize_t getline(char **buf, size_t *bufsiz, FILE *fp);
+#if (_WIN32_WINNT < 0x0600)
 int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
+#endif /* (_WIN32_WINNT < 0x0600) */

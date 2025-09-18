@@ -70,6 +70,7 @@ ssize_t getline(char **buf, size_t *bufsiz, FILE *fp)
 	return getdelim(buf, bufsiz, '\n', fp);
 }
 
+#if (_WIN32_WINNT < 0x0600)
 int inet_pton(int af, const char *src, void *dst)
 {
 	struct sockaddr_storage ss = { 0 };
@@ -103,3 +104,4 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size)
 		return NULL;
 	return WSAAddressToString((struct sockaddr *)&ss, sizeof(ss), NULL, dst, &s) ? NULL : dst;
 }
+#endif /* (_WIN32_WINNT < 0x0600) */

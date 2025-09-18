@@ -56,11 +56,14 @@ Commands prefixed with `$` should be executed by an unprivileged user,
 while those with `#` are to be executed with root privileges, but in the same
 established working directory context.
 
+Note that if a wolfSSL release archive is used in lieu of `git` sources, the
+release must be newer than 5.8.2.
+
 
 ### Building and installing non-FIPS `git` sources
 
 
-(1) Create a top level directory for the sources and populate it:
+(1) **Create a top level directory for the sources and populate it**:
 ```
 $ mkdir wolf-sources
 $ cd wolf-sources
@@ -68,7 +71,7 @@ $ git clone https://github.com/wolfssl/wolfssl --branch nightly-snapshot
 $ git clone https://github.com/wolfssl/wolfguard
 ```
 
-(2) Build and install the wolfssl user library:
+(2) **Build and install the wolfssl user library**:
 
 ```
 $ cd wolfssl
@@ -79,7 +82,7 @@ $ ./wolfcrypt/test/testwolfcrypt
 # make install
 ```
 
-(3) Build and install the `wg-fips` user tool -- note, installation will move existing
+(3) **Build and install the `wg-fips` user tool** -- note, installation will move existing
 WireGuard `wg` and `wg-quick` executables and man pages in the destination directories (if
 present) to `wg-wireguard` and `wg-wireguard-quick` respectively, and will
 install symbolic links for `wg` and `wg-quick` that point to the WolfGuard versions.
@@ -90,7 +93,7 @@ $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
 
-(4) Build and install the wolfssl kernel module.  Replace `/usr/src/linux` with
+(4) **Build and install the wolfssl kernel module.**  Replace `/usr/src/linux` with
 the path to your actual target kernel source tree, which must be fully
 configured and built, and precisely match the kernel you will boot on your
 target system.  The `modprobe` at the end assumes you are targeting the native
@@ -105,7 +108,20 @@ $ make -j
 # modprobe libwolfssl
 ```
 
-(5) Build and install the wolfguard kernel module.  Again, replace
+Before you put the wolfssl kernel module in production, you should build and
+load it with extended self-test enabled.  Replace the `./configure` recipe above
+with the following:
+```
+$ ./configure --enable-all-crypto --enable-cryptonly --enable-intelasm \
+   --enable-linuxkm --with-linux-source=/usr/src/linux \
+   --prefix=$(pwd)/linuxkm/build --enable-crypttests \
+   CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
+```
+The extra options are not appropriate for production, but a module configured
+with them should be loaded in a representative runtime environment to confirm
+that all algorithms function correctly.
+
+(5) **Build and install the wolfguard kernel module.**  Again, replace
 `/usr/src/linux` with the path to your actual target kernel source tree, and
 replace `6.16.5-gentoo` with the actual value returned by `uname -r` on the
 target system.  And again, the `modprobe` at the end assumes you are targeting
@@ -129,7 +145,7 @@ keys using the WolfGuard `wg-fips` tool (`wg` will at this point be a link to
 FIPS certified versions of the wolfssl source archive are supplied separately.
 Contact <fips@wolfssl.com>.
 
-(1) Create a top level directory for the sources and populate it.  This
+(1) **Create a top level directory for the sources and populate it.**  This
 procedure assumes a wolfssl archive in `7z` format -- substitute `tar -xf` if the
 archive is a `.tar.gz`.  In either case, adjust the `ln -s` recipe to assure
 `wolfssl` is a symbolic link to the extracted wolfssl directory.  Also note that
@@ -143,7 +159,7 @@ $ ln -s wolfssl-X-fips-linuxvX-kernel wolfssl
 $ git clone https://github.com/wolfssl/wolfguard
 ```
 
-(2) Build and install the wolfssl user library.  The argument to `--enable-fips`
+(2) **Build and install the wolfssl user library.**  The argument to `--enable-fips`
 must match the FIPS flavor of the archive.  Currently the most common arguments
 are `v5` and `v6`.
 
@@ -157,7 +173,7 @@ $ ./wolfcrypt/test/testwolfcrypt
 # make install
 ```
 
-(3) Build and install the `wg-fips` user tool -- note, installation will move existing
+(3) **Build and install the `wg-fips` user tool** -- note, installation will move existing
 WireGuard `wg` and `wg-quick` executables and man pages in the destination directories (if
 present) to `wg-wireguard` and `wg-wireguard-quick` respectively, and will
 install symbolic links for `wg` and `wg-quick` that point to the WolfGuard versions.
@@ -168,7 +184,7 @@ $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
 
-(4) Build and install the wolfssl kernel module.  Replace `/usr/src/linux` with
+(4) **Build and install the wolfssl kernel module.**  Replace `/usr/src/linux` with
 the path to your actual target kernel source tree, which must be fully
 configured and built, and precisely match the kernel you will boot on your
 target system.
@@ -179,7 +195,7 @@ incorrect integrity hash.  Then you will load it to capture the correct hash
 and load the module with the correct hash.
 ```
 $ cd ../../wolfssl
-$ ./configure --enable-fips=vX --enable-all-crypto --enable-cryptonly \
+$ ./configure --enable-fips=vX --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j
@@ -192,7 +208,31 @@ $ make -j
 # modprobe libwolfssl
 ```
 
-(5) Build and install the wolfguard kernel module.  Again, replace
+If the second `modprobe` fails like the first one, with another "Update
+verifyCore[] in fips_test.c with new hash ..." message in the kernel log, then
+your toolchain and/or target kernel configuration are defeating reproducible
+build.  In that case, you should use this alternative strategy, replacing the
+steps after the `NEWHASH=` command above:
+```
+$ make module-update-fips-hash FIPS_HASH="$NEWHASH"
+# make install
+# modprobe libwolfssl
+```
+
+Before you put the wolfssl kernel module in production, you should build and
+load it with extended self-test enabled.  To do this, replace the `./configure`
+recipe above with the following:
+```
+$ ./configure --enable-fips=vX --enable-cryptonly \
+   --enable-linuxkm --with-linux-source=/usr/src/linux \
+   --prefix=$(pwd)/linuxkm/build --enable-crypttests \
+   CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
+```
+The extra options are not appropriate for production, but a module configured
+with them should be loaded in a representative runtime environment to confirm
+that all algorithms function correctly.
+
+(5) **Build and install the wolfguard kernel module.**  Again, replace
 `/usr/src/linux` with the path to your actual target kernel source tree, and
 replace `6.16.5-gentoo` with the actual value returned by `uname -r` on the
 target system.

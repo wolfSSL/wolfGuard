@@ -566,7 +566,8 @@ static int wg_set_device(struct sk_buff *skb, struct genl_info *info)
 		 */
                 if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
                                                   public_key, sizeof(public_key),
-                                                  NOISE_CURVE_ID) == 0)
+                                                  NOISE_CURVE_ID,
+                                                  WG_PUBLIC_KEY_COMPRESSED) == 0)
                 {
 			peer = wg_pubkey_hashtable_lookup(wg->peer_hashtable,
 							  public_key);

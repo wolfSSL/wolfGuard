@@ -7,6 +7,10 @@
 #include <linux/random.h>
 #include "wolfcrypt_glue.h"
 
+#if defined(WG_USE_PUBLIC_KEY_COMPRESSION) && !defined(HAVE_COMP_KEY)
+	#error WG_USE_PUBLIC_KEY_COMPRESSION requires HAVE_COMP_KEY
+#endif
+
 int wc_hmac_oneshot_prealloc(struct Hmac *wc_hmac, const int type, byte *out, const size_t out_space, const byte *message,
 		    const size_t message_len, const byte *key, const size_t key_len)
 {
@@ -452,7 +456,7 @@ bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len,
 
 int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,
-                             const int curve_id)
+                             const int curve_id, int compressed)
 {
         struct wc_rng_inst *rng = NULL;
         ecc_key *key = NULL;
@@ -505,7 +509,13 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
         {
             word32 outLen = (word32)public_len;
             PRIVATE_KEY_UNLOCK();
+#ifdef HAVE_COMP_KEY
+            ret = wc_ecc_export_x963_ex(key, public, &outLen, compressed);
+#else
+            if (compressed)
+                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
             ret = wc_ecc_export_x963(key, public, &outLen);
+#endif
             PRIVATE_KEY_LOCK();
             if (ret)
                 goto out;
@@ -532,7 +542,7 @@ out:
 
 int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
                                   u8 *public, const size_t public_len,
-                                  const int curve_id)
+                                  const int curve_id, int compressed)
 {
         ecc_key *key = NULL;
         int key_inited = 0;
@@ -577,7 +587,13 @@ int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
         {
             word32 outLen = (word32)public_len;
             PRIVATE_KEY_UNLOCK();
+#ifdef HAVE_COMP_KEY
+            ret = wc_ecc_export_x963_ex(key, public, &outLen, compressed);
+#else
+            if (compressed)
+                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
             ret = wc_ecc_export_x963(key, public, &outLen);
+#endif
             PRIVATE_KEY_LOCK();
             if (ret)
                 goto out;

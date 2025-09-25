@@ -217,7 +217,15 @@ static int wc_ecc_private_to_public_exim(const byte *private, const size_t priva
         {
             word32 outLen = (word32)public_len;
             PRIVATE_KEY_UNLOCK();
+
+        #ifdef HAVE_COMP_KEY
+            ret = wc_ecc_export_x963_ex(key, public, &outLen, WG_PUBLIC_KEY_COMPRESSED);
+        #else
+            #if WG_PUBLIC_KEY_COMPRESSED
+            #error WG_PUBLIC_KEY_COMPRESSED without HAVE_COMP_KEY
+            #endif
             ret = wc_ecc_export_x963(key, public, &outLen);
+        #endif
             PRIVATE_KEY_LOCK();
             if (ret)
                 goto out;

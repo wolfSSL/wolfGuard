@@ -236,11 +236,11 @@ int wc_linuxkm_drbg_seed(struct wc_linuxkm_drbg_ctx *ctx,
 
 int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,
-                             const int curve_id);
+                             const int curve_id, int compressed);
 
 int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
                                   u8 *public, const size_t public_len,
-                                  const int curve_id);
+                                  const int curve_id, int compressed);
 
 int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
                               const u8 *private, size_t private_len,

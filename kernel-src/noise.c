@@ -334,7 +334,7 @@ void wg_noise_set_static_identity_private_key(
 	static_identity->has_identity = wc_ecc_private_to_public_exim(
 		static_identity->static_private, sizeof(static_identity->static_private),
 		static_identity->static_public, sizeof(static_identity->static_public),
-		NOISE_CURVE_ID) == 0;
+		NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) == 0;
 }
 
 /* This is Hugo Krawczyk's HKDF:
@@ -600,7 +600,7 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 	/* e */
 	if (wc_ecc_make_keypair_exim(handshake->ephemeral_private, sizeof(handshake->ephemeral_private),
 				     dst->unencrypted_ephemeral, sizeof(dst->unencrypted_ephemeral),
-				     NOISE_CURVE_ID) != 0)
+				     NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) != 0)
 	    goto out;
 
 	message_ephemeral(dst->unencrypted_ephemeral,
@@ -756,7 +756,7 @@ bool wg_noise_handshake_create_response(struct message_handshake_response *dst,
 	/* e */
 	if (wc_ecc_make_keypair_exim(handshake->ephemeral_private, sizeof(handshake->ephemeral_private),
 				     dst->unencrypted_ephemeral, sizeof(dst->unencrypted_ephemeral),
-				     NOISE_CURVE_ID) != 0)
+				     NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) != 0)
 		goto out;
 
 	message_ephemeral(dst->unencrypted_ephemeral,

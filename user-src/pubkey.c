@@ -14,6 +14,10 @@
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 
+#if defined(WG_USE_PUBLIC_KEY_COMPRESSION) && !defined(HAVE_COMP_KEY)
+	#error WG_USE_PUBLIC_KEY_COMPRESSION requires HAVE_COMP_KEY
+#endif
+
 int pubkey_main(int argc, char *argv[])
 {
 	uint8_t key[WG_KEY_LEN_MAX];
@@ -30,12 +34,12 @@ int pubkey_main(int argc, char *argv[])
 		goto out;
 	}
 
-        ret = wc_ecc_init(&key_ecc);
-        if (ret) {
+	ret = wc_ecc_init(&key_ecc);
+	if (ret) {
 		fprintf(stderr, "wc_ecc_init() returned error: %s.\n", wc_GetErrorString(ret));
 		goto out;
 	}
-        key_ecc_inited = 1;
+	key_ecc_inited = 1;
 
 	if (fread(base64, 1, WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1, stdin) != WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1) {
 		errno = EINVAL;
@@ -59,9 +63,9 @@ int pubkey_main(int argc, char *argv[])
 		goto out;
 	}
 
-        ret = wc_ecc_import_private_key_ex(key, WG_PRIVATE_KEY_LEN,
-                                           NULL, 0, &key_ecc, WG_CURVE_ID);
-        if (ret) {
+	ret = wc_ecc_import_private_key_ex(key, WG_PRIVATE_KEY_LEN,
+					   NULL, 0, &key_ecc, WG_CURVE_ID);
+	if (ret) {
 		fprintf(stderr, "wc_ecc_import_private_key_ex() returned error: %s.\n", wc_GetErrorString(ret));
 		goto out;
 	}
@@ -82,7 +86,14 @@ int pubkey_main(int argc, char *argv[])
 	{
 		word32 outLen = (word32)sizeof(key);
 		PRIVATE_KEY_UNLOCK(); /* should not be needed, but is... */
+	#ifdef HAVE_COMP_KEY
+		ret = wc_ecc_export_x963_ex(&key_ecc, key, &outLen, WG_PUBLIC_KEY_COMPRESSED);
+	#else
+		#if WG_PUBLIC_KEY_COMPRESSED
+		#error WG_PUBLIC_KEY_COMPRESSED without HAVE_COMP_KEY
+		#endif
 		ret = wc_ecc_export_x963(&key_ecc, key, &outLen);
+	#endif
 		PRIVATE_KEY_LOCK();
 		if (ret) {
 			fprintf(stderr, "wc_ecc_export_x963() returned error: %s.\n", wc_GetErrorString(ret));
@@ -105,8 +116,8 @@ int pubkey_main(int argc, char *argv[])
 out:
 
 	if (key_ecc_inited)
-                wc_ecc_free(&key_ecc);
-        if (rng_inited)
+		wc_ecc_free(&key_ecc);
+	if (rng_inited)
 		wc_FreeRng(&rng);
 	memset(key, 0, sizeof(key));
 	memset(base64, 0, sizeof(base64));

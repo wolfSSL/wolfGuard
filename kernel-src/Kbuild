@@ -27,3 +27,7 @@ endif
 ccflags-y += -I$(shell $(CC) -print-file-name=include) -I$(WOLFSSL_INCLUDE)
 wolfguard-y += wolfcrypt_glue.o
 KBUILD_EXTRA_SYMBOLS := $(WOLFSSL_ROOT)/linuxkm/Module.symvers
+
+ifdef EXTRA_CFLAGS
+ccflags-y += $(EXTRA_CFLAGS)
+endif

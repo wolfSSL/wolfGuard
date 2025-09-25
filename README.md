@@ -52,6 +52,10 @@ The `--enable-intelasm` option should only be used with x86 CPU targets, and for
 FIPS, only on FIPS sources that support it.  Contact us at <fips@wolfssl.com>
 for more info.
 
+The `--enable-wolfguard` option enables the minimum library/module feature set
+required for WolfGuard.  For a more comprehensive feature set, use
+`--enable-all-crypto` instead.
+
 Commands prefixed with `$` should be executed by an unprivileged user,
 while those with `#` are to be executed with root privileges, but in the same
 established working directory context.
@@ -71,12 +75,12 @@ $ git clone https://github.com/wolfssl/wolfssl --branch nightly-snapshot
 $ git clone https://github.com/wolfssl/wolfguard
 ```
 
-(2) **Build and install the wolfssl user library**:
+(2) **Build and install the libwolfssl user library**:
 
 ```
 $ cd wolfssl
 $ ./autogen.sh
-$ ./configure --enable-all-crypto
+$ ./configure --enable-wolfguard --enable-all-asm
 $ make -j
 $ ./wolfcrypt/test/testwolfcrypt
 # make install
@@ -93,14 +97,24 @@ $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
 
-(4) **Build and install the wolfssl kernel module.**  Replace `/usr/src/linux` with
+Experimental support is available for compressed public keys, whose base64 exported lengths
+are the same as WireGuard Curve25519 public keys.  This can be enabled by substituting
+```
+$ make -j EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION
+```
+in the above.  Note, however, that WolfGuard with
+`WG_USE_PUBLIC_KEY_COMPRESSION` is incompatible with default WolfGuard settings --
+when set, compressed public keys are supplied and expected, both in local
+configuration and in over-the-wire negotiations.
+
+(4) **Build and install the libwolfssl kernel module.**  Replace `/usr/src/linux` with
 the path to your actual target kernel source tree, which must be fully
 configured and built, and precisely match the kernel you will boot on your
 target system.  The `modprobe` at the end assumes you are targeting the native
 running system.
 ```
 $ cd ../../wolfssl
-$ ./configure --enable-all-crypto --enable-cryptonly --enable-intelasm \
+$ ./configure --enable-wolfguard --enable-cryptonly --enable-intelasm \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j
@@ -108,11 +122,11 @@ $ make -j
 # modprobe libwolfssl
 ```
 
-Before you put the wolfssl kernel module in production, you should build and
+Before you put the libwolfssl kernel module in production, you should build and
 load it with extended self-test enabled.  Replace the `./configure` recipe above
 with the following:
 ```
-$ ./configure --enable-all-crypto --enable-cryptonly --enable-intelasm \
+$ ./configure --enable-wolfguard --enable-cryptonly --enable-intelasm \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build --enable-crypttests \
    CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
@@ -132,6 +146,11 @@ $ make -j KERNELDIR=/usr/src/linux KERNELRELEASE=6.16.5-gentoo
 # make install
 # modprobe wolfguard
 ```
+
+As for the `wg-fips` build above, compressed public key support can be enabled
+by adding `EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION` to the above `make`
+recipe.  The `WG_USE_PUBLIC_KEY_COMPRESSION` setting must be matched throughout
+the ecosystem.
 
 If all of the above succeeds, then you are now ready to bring up WolfGuard
 tunnels.  Existing playbooks and scripting for WireGuard can be used directly,
@@ -159,13 +178,13 @@ $ ln -s wolfssl-X-fips-linuxvX-kernel wolfssl
 $ git clone https://github.com/wolfssl/wolfguard
 ```
 
-(2) **Build and install the wolfssl user library.**  The argument to `--enable-fips`
-must match the FIPS flavor of the archive.  Currently the most common arguments
-are `v5` and `v6`.
+(2) **Build and install the libwolfssl user library.**  The argument to `--enable-fips`
+must match the FIPS flavor of the archive.  Currently the most apt arguments
+for WolfGuard usage are `v5.2.4` and `v6`.
 
 ```
 $ cd wolfssl
-$ ./configure --enable-fips=vX --enable-all-crypto
+$ ./configure --enable-fips=vX --enable-wolfguard
 $ make -j
 $ ./fips-hash.sh
 $ make -j
@@ -184,7 +203,7 @@ $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
 
-(4) **Build and install the wolfssl kernel module.**  Replace `/usr/src/linux` with
+(4) **Build and install the libwolfssl kernel module.**  Replace `/usr/src/linux` with
 the path to your actual target kernel source tree, which must be fully
 configured and built, and precisely match the kernel you will boot on your
 target system.
@@ -192,10 +211,11 @@ target system.
 This is a two-step process.  First you will build and install the module with an
 incorrect integrity hash.  Then you will load it to capture the correct hash
 (the instructions assume targeting the native system).  Then you will rebuild
-and load the module with the correct hash.
+and load the module with the correct hash.  Note that the lowest libwolfssl FIPS
+version compatible with Linux kernel mode is `v5.2.4`.
 ```
 $ cd ../../wolfssl
-$ ./configure --enable-fips=vX --enable-cryptonly \
+$ ./configure --enable-fips=vX --enable-wolfguard --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j
@@ -219,11 +239,11 @@ $ make module-update-fips-hash FIPS_HASH="$NEWHASH"
 # modprobe libwolfssl
 ```
 
-Before you put the wolfssl kernel module in production, you should build and
+Before you put the libwolfssl kernel module in production, you should build and
 load it with extended self-test enabled.  To do this, replace the `./configure`
 recipe above with the following:
 ```
-$ ./configure --enable-fips=vX --enable-cryptonly \
+$ ./configure --enable-fips=vX --enable-wolfguard --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build --enable-crypttests \
    CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
@@ -247,4 +267,9 @@ As with the non-FIPS-certified procedure, if all of the above succeeds, then you
 are now ready to bring up WolfGuard tunnels.  Existing playbooks and scripting
 for WireGuard can be used directly, provided you substitute `/etc/wolfguard` for
 `/etc/wireguard`, and generate all keys using the WolfGuard `wg-fips` tool (`wg`
-will at this point be a link to `wg-fips`).
+will at this point be a link to `wg-fips`).  However, note that some WireGuard
+client applications and automation frameworks expect WireGuard public keys to be
+exported with exactly 44 characters of base64.  WolfGuard public keys are
+roughly twice that length, unless built with `WG_USE_PUBLIC_KEY_COMPRESSION`,
+which is not currently supported in FIPS v5, but is supported in FIPS v6 and
+later.

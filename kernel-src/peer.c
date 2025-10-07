@@ -65,7 +65,8 @@ struct wg_peer *wg_peer_create(struct wg_device *wg,
 	wg_noise_reset_last_sent_handshake(&peer->last_sent_handshake);
 	set_bit(NAPI_STATE_NO_BUSY_POLL, &peer->napi.state);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)) || \
-    (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 5))))
+    (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 5)))) || \
+    (defined(RHEL_MAJOR) && (((RHEL_MAJOR == 8) && (RHEL_MINOR >= 10))))
 	netif_napi_add_weight(wg->dev, &peer->napi, wg_packet_rx_poll,
 		       NAPI_POLL_WEIGHT);
 #else

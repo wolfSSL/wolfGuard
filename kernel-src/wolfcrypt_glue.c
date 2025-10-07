@@ -388,9 +388,12 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
         }
 
         sg_miter_stop(&miter);
+
+        goto out;
     }
-    else {
+
     copy_after_all:
+    {
         byte *buf = (byte *)XMALLOC(src_len + WC_AES_BLOCK_SIZE, NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
         if (! buf) {

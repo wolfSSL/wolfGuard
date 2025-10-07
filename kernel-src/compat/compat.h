@@ -19,7 +19,9 @@
 #endif
 #elif RHEL_MAJOR == 8
 #define ISRHEL8
-#if RHEL_MINOR == 2
+#if RHEL_MINOR >= 10
+#define ISRHEL8V10P
+#elif RHEL_MINOR == 2
 #define ISCENTOS8
 #endif
 #endif
@@ -359,7 +361,7 @@ static inline bool rng_is_initialized(void)
 #define system_power_efficient_wq system_unbound_wq
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 0) && !defined(ISRHEL8V10P)
 #include <linux/ktime.h>
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0)
 #include <linux/hrtimer.h>
@@ -696,7 +698,7 @@ static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 #define hlist_add_behind(a, b) hlist_add_after(b, a)
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0) && !defined(ISRHEL8V10P)
 #define totalram_pages() totalram_pages
 #endif
 
@@ -788,7 +790,7 @@ static inline void skb_mark_not_on_list(struct sk_buff *skb)
 #endif
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 5, 0) && !defined(ISRHEL8V10P)
 #define genl_dumpit_info(cb) ({ \
 	struct { struct nlattr **attrs; } *a = (void *)((u8 *)cb->args + offsetofend(struct dump_ctx, next_allowedip)); \
 	BUILD_BUG_ON(sizeof(cb->args) < offsetofend(struct dump_ctx, next_allowedip) + sizeof(*a)); \

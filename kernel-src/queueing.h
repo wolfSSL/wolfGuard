@@ -84,7 +84,8 @@ static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 	skb_scrub_packet(skb, true);
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 17, 0)) || \
-    (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 5))))
+    (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 5)))) || \
+    (defined(RHEL_MAJOR) && (((RHEL_MAJOR == 8) && (RHEL_MINOR >= 10))))
 	memset(&skb->headers, 0,
                sizeof skb->headers);
 #else

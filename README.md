@@ -117,7 +117,7 @@ $ cd ../../wolfssl
 $ ./configure --enable-wolfguard --enable-cryptonly --enable-intelasm \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
-$ make -j
+$ make -j module
 # make install
 # modprobe libwolfssl
 ```
@@ -209,21 +209,25 @@ configured and built, and precisely match the kernel you will boot on your
 target system.
 
 This is a two-step process.  First you will build and install the module with an
-incorrect integrity hash.  Then you will load it to capture the correct hash
-(the instructions assume targeting the native system).  Then you will rebuild
-and load the module with the correct hash.  Note that the lowest libwolfssl FIPS
-version compatible with Linux kernel mode is `v5.2.4`.
+incorrect integrity hash.  Then you will load it to capture the correct hash,
+which will exit early with an expected “Operation canceled” error.  Then you
+will rebuild and load the module with the correct hash.  Note that thes
+instructions assume targeting the native system.  Note also that the lowest
+libwolfssl FIPS version compatible with Linux kernel mode is `v5.2.4`.
 ```
 $ cd ../../wolfssl
 $ ./configure --enable-fips=vX --enable-wolfguard --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
-$ make -j
+$ make -j module
 # make install
 # modprobe libwolfssl
+```
+(Expect early exit of the above `modprobe`, with an “Operation canceled” message.)
+```
 $ NEWHASH=$(dmesg | awk '{if (match($0, " new hash \"([^\"]+)\" ", hash_a)) { hash = hash_a[1]; }} END {print hash}')
 $ sed --in-place=.bak "s/^\".*\";/\"${NEWHASH}\";/" wolfcrypt/src/fips_test.c
-$ make -j
+$ make -j module
 # make install
 # modprobe libwolfssl
 ```

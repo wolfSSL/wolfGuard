@@ -77,6 +77,10 @@ $ git clone https://github.com/wolfssl/wolfguard
 
 (2) **Build and install the libwolfssl user library**:
 
+Note, this step is optional on Linux, where by default `wg-fips` offloads key
+generation and conversion operations to the kernel module, rather than
+performing them internally.
+
 ```
 $ cd wolfssl
 $ ./autogen.sh
@@ -96,6 +100,9 @@ $ make -j
 $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
+
+To force use of internal key ops on Linux, rather than the default offload to
+the kernel module, replace `make -j` with `make -j NO_IPC_LLCRYPTO=1`.
 
 Experimental support is available for compressed public keys, whose base64 exported lengths
 are the same as WireGuard Curve25519 public keys.  This can be enabled by substituting
@@ -135,7 +142,7 @@ The extra options are not appropriate for production, but a module configured
 with them should be loaded in a representative runtime environment to confirm
 that all algorithms function correctly.
 
-(5) **Build and install the wolfguard kernel module.**  Again, replace
+(5) **Build and install the WolfGuard kernel module.**  Again, replace
 `/usr/src/linux` with the path to your actual target kernel source tree, and
 replace `6.16.5-gentoo` with the actual value returned by `uname -r` on the
 target system.  And again, the `modprobe` at the end assumes you are targeting
@@ -146,6 +153,9 @@ $ make -j KERNELDIR=/usr/src/linux KERNELRELEASE=6.16.5-gentoo
 # make install
 # modprobe wolfguard
 ```
+
+The `KERNELRELEASE` value is, effectively, the verbatim name of the directory
+under `/lib/modules/` where the target kernel's modules are installed.
 
 As for the `wg-fips` build above, compressed public key support can be enabled
 by adding `EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION` to the above `make`
@@ -178,9 +188,11 @@ $ ln -s wolfssl-X-fips-linuxvX-kernel wolfssl
 $ git clone https://github.com/wolfssl/wolfguard
 ```
 
-(2) **Build and install the libwolfssl user library.**  The argument to `--enable-fips`
-must match the FIPS flavor of the archive.  Currently the most apt arguments
-for WolfGuard usage are `v5.2.4` and `v6`.
+(2) **Build and install the libwolfssl user library.**
+
+Note, this step is optional on Linux, where by default `wg-fips` offloads key
+generation and conversion operations to the kernel module, rather than
+performing them internally.
 
 ```
 $ cd wolfssl
@@ -191,6 +203,10 @@ $ make -j
 $ ./wolfcrypt/test/testwolfcrypt
 # make install
 ```
+
+Note, the argument to `--enable-fips`
+must match the FIPS flavor of the archive.  Currently the most apt arguments
+for WolfGuard usage are `v5.2.4` and `v6`.
 
 (3) **Build and install the `wg-fips` user tool** -- note, installation will move existing
 WireGuard `wg` and `wg-quick` executables and man pages in the destination directories (if
@@ -203,6 +219,9 @@ $ ./wg-fips genkey | ./wg-fips pubkey
 # make install
 ```
 
+To force use of internal key ops on Linux, rather than the default offload to
+the kernel module, replace `make -j` with `make -j NO_IPC_LLCRYPTO=1`.
+
 (4) **Build and install the libwolfssl kernel module.**  Replace `/usr/src/linux` with
 the path to your actual target kernel source tree, which must be fully
 configured and built, and precisely match the kernel you will boot on your
@@ -211,7 +230,7 @@ target system.
 This is a two-step process.  First you will build and install the module with an
 incorrect integrity hash.  Then you will load it to capture the correct hash,
 which will exit early with an expected “Operation canceled” error.  Then you
-will rebuild and load the module with the correct hash.  Note that thes
+will rebuild and load the module with the correct hash.  Note that these
 instructions assume targeting the native system.  Note also that the lowest
 libwolfssl FIPS version compatible with Linux kernel mode is `v5.2.4`.
 ```
@@ -256,7 +275,7 @@ The extra options are not appropriate for production, but a module configured
 with them should be loaded in a representative runtime environment to confirm
 that all algorithms function correctly.
 
-(5) **Build and install the wolfguard kernel module.**  Again, replace
+(5) **Build and install the WolfGuard kernel module.**  Again, replace
 `/usr/src/linux` with the path to your actual target kernel source tree, and
 replace `6.16.5-gentoo` with the actual value returned by `uname -r` on the
 target system.

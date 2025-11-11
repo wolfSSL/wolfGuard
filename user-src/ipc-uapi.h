@@ -17,9 +17,6 @@
 #include "encoding.h"
 #include "ctype.h"
 
-#include <wolfssl/wolfcrypt/ecc.h>
-#include <wolfssl/wolfcrypt/random.h>
-
 #ifdef _WIN32
 #include "ipc-uapi-windows.h"
 #else
@@ -173,6 +170,13 @@ out:
 	num; \
 })
 
+#if !defined(IPC_SUPPORTS_KERNEL_INTERFACE) || defined(NO_IPC_LLCRYPTO)
+
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/random.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+
 static int wc_ecc_private_to_public_exim(const byte *private, const size_t private_len,
                                   byte *public, const size_t public_len,
                                   const int curve_id)
@@ -246,6 +250,8 @@ out:
         return ret;
 }
 
+#endif /* !IPC_SUPPORTS_KERNEL_INTERFACE || NO_IPC_LLCRYPTO */
+
 static int userspace_get_device(struct wgdevice **out, const char *iface)
 {
 	struct wgdevice *dev;
@@ -288,10 +294,12 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 			if (!wg_from_hex(dev->private_key, sizeof(dev->private_key), value, value_len))
 				break;
 			dev->flags |= WGDEVICE_HAS_PRIVATE_KEY;
+#if !defined(IPC_SUPPORTS_KERNEL_INTERFACE) || defined(NO_IPC_LLCRYPTO)
                         if (wc_ecc_private_to_public_exim(dev->private_key, sizeof(dev->private_key),
                                                           dev->public_key, sizeof(dev->public_key),
                                                           WG_CURVE_ID) == 0)
 			dev->flags |= WGDEVICE_HAS_PUBLIC_KEY;
+#endif
 		} else if (!peer && !strcmp(key, "listen_port")) {
 			dev->listen_port = NUM(0xffffU);
 			dev->flags |= WGDEVICE_HAS_LISTEN_PORT;

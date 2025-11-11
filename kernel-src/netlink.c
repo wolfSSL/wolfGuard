@@ -15,6 +15,7 @@
 #include <linux/if.h>
 #include <net/genetlink.h>
 #include <net/sock.h>
+#include "wolfcrypt_glue.h"
 
 static struct genl_family genl_family;
 
@@ -26,7 +27,8 @@ static const struct nla_policy device_policy[WGDEVICE_A_MAX + 1] = {
 	[WGDEVICE_A_FLAGS]		= { .type = NLA_U32 },
 	[WGDEVICE_A_LISTEN_PORT]	= { .type = NLA_U16 },
 	[WGDEVICE_A_FWMARK]		= { .type = NLA_U32 },
-	[WGDEVICE_A_PEERS]		= { .type = NLA_NESTED }
+	[WGDEVICE_A_PEERS]		= { .type = NLA_NESTED },
+	[WGDEVICE_A_PRESHARED_KEY]	= NLA_POLICY_EXACT_LEN(NOISE_SYMMETRIC_KEY_LEN)
 };
 
 static const struct nla_policy peer_policy[WGPEER_A_MAX + 1] = {
@@ -619,6 +621,224 @@ out_nodev:
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
+static int wg_nl_generate_privkey(struct sk_buff *skb, struct genl_info *info)
+{
+	int ret = -ENOMEM;
+	u8 *private = NULL, *public = NULL;
+	struct sk_buff *reply;
+	void *hdr = NULL;
+
+	if ((! skb) || (! info) || (! info->genlhdr))
+		return -EINVAL;
+	if (info->genlhdr->cmd != WG_CMD_GEN_PRIVKEY)
+		return -EINVAL;
+
+	private = (u8 *)malloc(NOISE_PRIVATE_KEY_LEN);
+	if (! private)
+		goto out;
+	public = (u8 *)malloc(NOISE_PUBLIC_KEY_LEN);
+	if (! public)
+		goto out;
+	reply = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (! reply)
+		goto out;
+
+	ret = wc_ecc_make_keypair_exim(private, NOISE_PRIVATE_KEY_LEN,
+				       public, NOISE_PUBLIC_KEY_LEN,
+				       WG_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED);
+	if (ret) {
+		pr_err("wc_ecc_make_keypair_exim() failed with code %d\n", ret);
+		ret = -ENOKEY;
+		goto out;
+	}
+
+	hdr = genlmsg_put(reply, info->snd_portid, info->snd_seq, &genl_family, 0, WG_CMD_GEN_PRIVKEY);
+	if (! hdr) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = nla_put(reply, WGDEVICE_A_PRIVATE_KEY, NOISE_PRIVATE_KEY_LEN, private);
+	if (ret < 0)
+		goto out;
+	ret = nla_put(reply, WGDEVICE_A_PUBLIC_KEY, NOISE_PUBLIC_KEY_LEN, public);
+	if (ret < 0)
+		goto out;
+
+	genlmsg_end(reply, hdr);
+	hdr = NULL;
+
+	ret = genlmsg_reply(reply, info);
+
+out:
+
+	if (private) {
+		memzero_explicit(private, NOISE_PRIVATE_KEY_LEN);
+		free(private);
+	}
+	if (public) {
+		free(public);
+	}
+
+	if (reply && ret) {
+		if (hdr)
+			genlmsg_cancel(reply, hdr);
+		nlmsg_free(reply);
+	}
+
+	return ret;
+
+	/* Copying note from above:
+	 *
+	 * At this point, we can't really deal ourselves with safely zeroing out
+	 * the private key material after usage. This will need an additional API
+	 * in the kernel for marking skbs as zero_on_free.
+	 */
+}
+
+static int wg_nl_derive_pubkey(struct sk_buff *skb, struct genl_info *info)
+{
+	int ret = -ENOMEM;
+	struct nlattr *priv_attr;
+	u8 *private; /* note, not const -- see below. */
+	u8 *public = NULL;
+	struct sk_buff *reply;
+	void *hdr = NULL;
+
+	if ((! skb) || (! info) || (! info->genlhdr))
+		return -EINVAL;
+	if (info->genlhdr->cmd != WG_CMD_DERIVE_PUBKEY)
+		return -EINVAL;
+
+	priv_attr = info->attrs[WGDEVICE_A_PRIVATE_KEY];
+	if (! priv_attr)
+		return -EINVAL;
+	if (nla_len(priv_attr) != NOISE_PRIVATE_KEY_LEN)
+		return -EINVAL;
+	private = nla_data(priv_attr);
+
+	public = (u8 *)malloc(NOISE_PUBLIC_KEY_LEN);
+	if (! public)
+		goto out;
+	reply = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (! reply)
+		goto out;
+
+	ret = wc_ecc_private_to_public_exim(private, NOISE_PRIVATE_KEY_LEN,
+					    public, NOISE_PUBLIC_KEY_LEN,
+					    WG_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED);
+
+	if (ret) {
+		pr_err("wc_ecc_private_to_public_exim() failed with code %d\n", ret);
+		ret = -ENOKEY;
+		goto out;
+	}
+
+	hdr = genlmsg_put(reply, info->snd_portid, info->snd_seq, &genl_family, 0, WG_CMD_DERIVE_PUBKEY);
+	if (! hdr) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = nla_put(reply, WGDEVICE_A_PUBLIC_KEY, NOISE_PUBLIC_KEY_LEN, public);
+	if (ret < 0)
+		goto out;
+
+	genlmsg_end(reply, hdr);
+	hdr = NULL;
+
+	ret = genlmsg_reply(reply, info);
+
+out:
+
+	if (private) {
+		/* note, this is zeroing the sensitives bytes in the skb
+		 * in-place, which is (barely) safe.
+		 */
+		memzero_explicit(private, NOISE_PRIVATE_KEY_LEN);
+	}
+	if (public) {
+		free(public);
+	}
+
+	if (reply && ret) {
+		if (hdr)
+			genlmsg_cancel(reply, hdr);
+		nlmsg_free(reply);
+	}
+
+	return ret;
+}
+
+static int wg_nl_generate_psk(struct sk_buff *skb, struct genl_info *info)
+{
+	int ret = -ENOMEM;
+	u8 *psk = NULL;
+	struct sk_buff *reply;
+	void *hdr = NULL;
+
+	if ((! skb) || (! info) || (! info->genlhdr))
+		return -EINVAL;
+	if (info->genlhdr->cmd != WG_CMD_GEN_PSK)
+		return -EINVAL;
+
+	psk = (u8 *)malloc(NOISE_SYMMETRIC_KEY_LEN);
+	if (! psk)
+		goto out;
+	reply = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+	if (! reply)
+		goto out;
+
+	ret = wc_linuxkm_drbg_generate(&wc_wg_drbg,
+				       NULL /* src */, 0 /* slen */,
+				       psk, NOISE_SYMMETRIC_KEY_LEN,
+				       0 /* nofail_p */);
+
+	if (ret) {
+		pr_err("wc_linuxkm_drbg_generate() failed with code %d\n", ret);
+		ret = -ENOKEY;
+		goto out;
+	}
+
+	hdr = genlmsg_put(reply, info->snd_portid, info->snd_seq, &genl_family, 0, WG_CMD_GEN_PSK);
+	if (! hdr) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = nla_put(reply, WGDEVICE_A_PRESHARED_KEY, NOISE_SYMMETRIC_KEY_LEN, psk);
+	if (ret < 0)
+		goto out;
+
+	genlmsg_end(reply, hdr);
+	hdr = NULL;
+
+	ret = genlmsg_reply(reply, info);
+
+out:
+
+	if (psk) {
+		memzero_explicit(psk, NOISE_SYMMETRIC_KEY_LEN);
+		free(psk);
+	}
+
+	if (reply && ret) {
+		if (hdr)
+			genlmsg_cancel(reply, hdr);
+		nlmsg_free(reply);
+	}
+
+	return ret;
+
+	/* Copying note from above:
+	 *
+	 * At this point, we can't really deal ourselves with safely zeroing out
+	 * the psk material after usage. This will need an additional API in the
+	 * kernel for marking skbs as zero_on_free.
+	 */
+}
+
+
 #ifndef COMPAT_CANNOT_USE_CONST_GENL_OPS
 static const
 #else
@@ -643,6 +863,18 @@ struct genl_ops genl_ops[] = {
 		.policy = device_policy,
 #endif
 		.flags = GENL_UNS_ADMIN_PERM
+	}, {
+		.cmd = WG_CMD_GEN_PRIVKEY,
+		.doit = wg_nl_generate_privkey,
+		.policy = device_policy
+	}, {
+		.cmd = WG_CMD_DERIVE_PUBKEY,
+		.doit = wg_nl_derive_pubkey,
+		.policy = device_policy
+	}, {
+		.cmd = WG_CMD_GEN_PSK,
+		.doit = wg_nl_generate_psk,
+		.policy = device_policy
 	}
 };
 
@@ -666,6 +898,9 @@ __ro_after_init = {
 
 int __init wg_genetlink_init(void)
 {
+	/* note, from kernel 3.13 - 4.9, use genl_register_family_with_ops(),
+	 * per https://wiki.linuxfoundation.org/networking/generic_netlink_howto
+	 */
 	WC_DEBUG_PR_NEG_RET(genl_register_family(&genl_family));
 }
 

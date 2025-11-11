@@ -26,10 +26,7 @@
 
 #include "encoding.h"
 #include "subcommands.h"
-
-#include <wolfssl/wolfcrypt/ecc.h>
-#include <wolfssl/wolfcrypt/random.h>
-#include <wolfssl/wolfcrypt/error-crypt.h>
+#include "ipc.h"
 
 #ifndef _WIN32
 static inline bool __attribute__((__warn_unused_result__)) get_random_bytes(uint8_t *out, size_t len)
@@ -75,45 +72,146 @@ static inline bool __attribute__((__warn_unused_result__)) get_random_bytes(uint
 }
 #endif
 
+#if defined(IPC_SUPPORTS_KERNEL_INTERFACE) && !defined(NO_IPC_LLCRYPTO)
 
 int genkey_main(int argc, char *argv[])
 {
-	WC_RNG rng;
-	int rng_inited = 0;
-        ecc_key key;
-        int key_inited = 0;
-	byte exported_private[WG_PRIVATE_KEY_LEN];
-	char exported_private_base64[WG_BASE64_LEN(WG_PRIVATE_KEY_LEN)];
-        int ret;
+	uint8_t *privkey = NULL;
+	size_t privkey_len;
+	char *privkey_base64 = NULL;
+	size_t privkey_base64_len;
+	int ret;
+
+	if (argc != 1) {
+		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
+		return 1;
+	}
+	ret = ipc_generate_privkey(&privkey, &privkey_len, NULL /* pubkey */, NULL /* pubkey_len */);
+	if (ret) {
+		fprintf(stderr, "ipc_generate_privkey() failed: %s.\n", strerror(-ret));
+		return ret;
+	}
+
+	privkey_base64_len = WG_BASE64_LEN(privkey_len);
+	privkey_base64 = (char *)malloc(privkey_base64_len);
+	if (! privkey_base64) {
+		fprintf(stderr, "malloc: %m\n");
+		goto out;
+	}
+
+	if (!wg_to_base64(privkey_base64, privkey_base64_len, privkey, privkey_len)) {
+		fprintf(stderr, "wg_to_base64() failed.\n");
+		goto out;
+	}
+
+	puts(privkey_base64);
+
+	ret = 0;
+
+out:
+
+	memset(privkey, 0, privkey_len);
+	free(privkey);
+	if (privkey_base64) {
+		memset(privkey_base64, 0, privkey_base64_len);
+		free(privkey_base64);
+	}
+
+	return ret;
+}
+
+int genpsk_main(int argc, char *argv[])
+{
+	uint8_t *psk = NULL;
+	size_t psk_len;
+	char *psk_base64 = NULL;
+	size_t psk_base64_len;
+	int ret;
 
 	if (argc != 1) {
 		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
 		return 1;
 	}
 
-        ret = wc_ecc_init(&key);
-        if (ret) {
+	ret = ipc_generate_psk(&psk, &psk_len);
+	if (ret) {
+		fprintf(stderr, "ipc_generate_psk() failed: %s.\n", strerror(-ret));
+		return ret;
+	}
+
+	psk_base64_len = WG_BASE64_LEN(psk_len);
+	psk_base64 = (char *)malloc(psk_base64_len);
+	if (! psk_base64) {
+		fprintf(stderr, "malloc: %m\n");
+		goto out;
+	}
+
+	if (!wg_to_base64(psk_base64, psk_base64_len, psk, psk_len)) {
+		fprintf(stderr, "wg_to_base64() failed.\n");
+		goto out;
+	}
+
+	puts(psk_base64);
+
+	ret = 0;
+
+out:
+
+	memset(psk, 0, psk_len);
+	free(psk);
+	if (psk_base64) {
+		memset(psk_base64, 0, psk_base64_len);
+		free(psk_base64);
+	}
+
+	return ret;
+}
+
+#else /* !IPC_SUPPORTS_KERNEL_INTERFACE || NO_IPC_LLCRYPTO */
+
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/random.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+
+int genkey_main(int argc, char *argv[])
+{
+	WC_RNG rng;
+	int rng_inited = 0;
+	ecc_key key;
+	int key_inited = 0;
+	byte exported_private[WG_PRIVATE_KEY_LEN];
+	char exported_private_base64[WG_BASE64_LEN(WG_PRIVATE_KEY_LEN)];
+	int ret;
+
+	if (argc != 1) {
+		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
+		return 1;
+	}
+
+	ret = wc_ecc_init(&key);
+	if (ret) {
 		fprintf(stderr, "wc_ecc_init() failed: %s.\n", wc_GetErrorString(ret));
 		goto out;
-        }
-        key_inited = 1;
+	}
+	key_inited = 1;
 
-        ret = wc_InitRng(&rng);
-        if (ret) {
+	ret = wc_InitRng(&rng);
+	if (ret) {
 		fprintf(stderr, "wc_InitRng() failed: %s.\n", wc_GetErrorString(ret));
 		goto out;
-        }
-        rng_inited = 1;
+	}
+	rng_inited = 1;
 
-        ret = wc_ecc_make_key_ex(
+	ret = wc_ecc_make_key_ex(
 		&rng,
 		0 /* keysize -- use curve_id to designate the curve. */,
 		&key,
 		WG_CURVE_ID);
-        if (ret)
+	if (ret)
 		goto out;
 
-        {
+	{
 		word32 outLen = (word32)sizeof(exported_private);
 		PRIVATE_KEY_UNLOCK();
 		ret = wc_ecc_export_private_only(&key, exported_private, &outLen);
@@ -127,25 +225,72 @@ int genkey_main(int argc, char *argv[])
 			ret = WC_KEY_SIZE_E;
 			goto out;
 		}
-        }
+	}
 
 	if (!wg_to_base64(exported_private_base64, sizeof(exported_private_base64), exported_private, sizeof(exported_private))) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
 		goto out;
-        }
+	}
 
 	puts(exported_private_base64);
 
-        ret = 0;
+	ret = 0;
 
 out:
 
 	memset(exported_private, 0, sizeof(exported_private));
 	memset(exported_private_base64, 0, sizeof(exported_private_base64));
-        if (rng_inited)
+	if (rng_inited)
 		wc_FreeRng(&rng);
 	if (key_inited)
 		wc_ecc_free(&key);
 
-        return ret;
+	return ret;
 }
+
+int genpsk_main(int argc, char *argv[])
+{
+	WC_RNG rng;
+	int rng_inited = 0;
+	byte psk[WG_SYMMETRIC_KEY_LEN];
+	char psk_base64[WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN)];
+	int ret;
+
+	if (argc != 1) {
+		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
+		return 1;
+	}
+
+	ret = wc_InitRng(&rng);
+	if (ret) {
+		fprintf(stderr, "wc_InitRng() failed: %s.\n", wc_GetErrorString(ret));
+		goto out;
+	}
+	rng_inited = 1;
+
+	ret = wc_RNG_GenerateBlock(&rng, psk, sizeof psk);
+	if (ret) {
+		fprintf(stderr, "wc_RNG_GenerateBlock() failed: %s.\n", wc_GetErrorString(ret));
+		goto out;
+	}
+
+	if (!wg_to_base64(psk_base64, sizeof(psk_base64), psk, sizeof psk)) {
+		fprintf(stderr, "wg_to_base64() failed.\n");
+		goto out;
+	}
+
+	puts(psk_base64);
+
+	ret = 0;
+
+out:
+
+	memset(psk, 0, sizeof psk);
+	memset(psk_base64, 0, sizeof psk_base64);
+	if (rng_inited)
+		wc_FreeRng(&rng);
+
+	return ret;
+}
+
+#endif /* !IPC_SUPPORTS_KERNEL_INTERFACE || NO_IPC_LLCRYPTO */

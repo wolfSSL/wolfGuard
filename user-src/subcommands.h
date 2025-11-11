@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ *
+ * Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #ifndef SUBCOMMANDS_H
@@ -13,5 +15,6 @@ int set_main(int argc, char *argv[]);
 int setconf_main(int argc, char *argv[]);
 int genkey_main(int argc, char *argv[]);
 int pubkey_main(int argc, char *argv[]);
+int genpsk_main(int argc, char *argv[]);
 
 #endif

@@ -22,7 +22,7 @@ user-src/tests/qemu/distfiles/
 *.nam
 *.til
 .cache.mk
-user-src/wg
-user-src/wg.exe
+user-src/wg-fips
+*.exe
 *.pro.user
 *~

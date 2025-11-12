@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 /*
  * Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ *
+ * Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #include <stdbool.h>
@@ -22,8 +24,6 @@
 #include "containers.h"
 #include "encoding.h"
 #include "netlink.h"
-
-#define IPC_SUPPORTS_KERNEL_INTERFACE
 
 #define SOCKET_BUFFER_SIZE (mnl_ideal_socket_buffer_size())
 
@@ -517,3 +517,262 @@ out:
 	errno = -ret;
 	return ret;
 }
+
+#ifndef NO_IPC_LLCRYPTO
+
+struct wgnl_privkey_args {
+	uint8_t **privkey;
+	size_t *privkey_len;
+	uint8_t **pubkey;
+	size_t *pubkey_len;
+};
+
+static int parse_privkey(const struct nlattr *attr, void *data)
+{
+	struct wgnl_privkey_args *privkey = data;
+
+	switch (mnl_attr_get_type(attr)) {
+	case WGDEVICE_A_PRIVATE_KEY:
+		*privkey->privkey_len = mnl_attr_get_payload_len(attr);
+		*privkey->privkey = malloc(*privkey->privkey_len);
+		if (! *privkey->privkey)
+			return MNL_CB_ERROR;
+		memcpy(*privkey->privkey, mnl_attr_get_payload(attr), *privkey->privkey_len);
+		break;
+	case WGDEVICE_A_PUBLIC_KEY:
+		if (! privkey->pubkey)
+			return MNL_CB_OK;
+		*privkey->pubkey_len = mnl_attr_get_payload_len(attr);
+		*privkey->pubkey = malloc(*privkey->pubkey_len);
+		if (! *privkey->pubkey)
+			return MNL_CB_ERROR;
+		memcpy(*privkey->pubkey, mnl_attr_get_payload(attr), *privkey->pubkey_len);
+		break;
+	}
+
+	return MNL_CB_OK;
+}
+
+static int read_privkey_cb(const struct nlmsghdr *nlh, void *data)
+{
+	return mnl_attr_parse(nlh, sizeof(struct genlmsghdr), parse_privkey, data);
+}
+
+static int kernel_generate_privkey(uint8_t **privkey, size_t *privkey_len, uint8_t **pubkey, size_t *pubkey_len)
+{
+	int ret;
+	struct nlmsghdr *nlh;
+	struct mnlg_socket *nlg;
+	struct wgnl_privkey_args privkey_args = {
+		.privkey = privkey,
+		.privkey_len = privkey_len,
+		.pubkey = pubkey,
+		.pubkey_len = pubkey_len
+	};
+
+	*privkey = NULL;
+	*privkey_len = 0;
+	if (pubkey) {
+		*pubkey = NULL;
+		*pubkey_len = 0;
+	}
+
+try_again:
+	ret = 0;
+
+	nlg = mnlg_socket_open(WG_GENL_NAME, WG_GENL_VERSION);
+	if (!nlg) {
+		fprintf(stderr, "mnlg_socket_open: %m.\n");
+		return -errno;
+	}
+
+	nlh = mnlg_msg_prepare(nlg, WG_CMD_GEN_PRIVKEY, NLM_F_REQUEST | NLM_F_ACK);
+	if (mnlg_socket_send(nlg, nlh) < 0) {
+		ret = -errno;
+		goto out;
+	}
+	errno = 0;
+	if (mnlg_socket_recv_run(nlg, read_privkey_cb, &privkey_args) < 0) {
+		ret = errno ? -errno : -EINVAL;
+		goto out;
+	}
+
+out:
+	if (nlg)
+		mnlg_socket_close(nlg);
+	if (ret) {
+		if (*privkey) {
+			memset(*privkey, 0, *privkey_len);
+			free(*privkey);
+			*privkey = 0;
+		}
+		*privkey_len = 0;
+		if (pubkey) {
+			if (*pubkey) {
+				free(*pubkey);
+				*pubkey = 0;
+			}
+			*pubkey_len = 0;
+		}
+		if (ret == -EINTR)
+			goto try_again;
+	}
+	errno = -ret;
+	return ret;
+}
+
+struct wgnl_pubkey_args {
+	uint8_t **pubkey;
+	size_t *pubkey_len;
+};
+
+static int parse_pubkey(const struct nlattr *attr, void *data)
+{
+	struct wgnl_pubkey_args *pubkey = data;
+
+	switch (mnl_attr_get_type(attr)) {
+	case WGDEVICE_A_PUBLIC_KEY:
+		if (! pubkey->pubkey)
+			return MNL_CB_OK;
+		*pubkey->pubkey_len = mnl_attr_get_payload_len(attr);
+		*pubkey->pubkey = malloc(*pubkey->pubkey_len);
+		if (! *pubkey->pubkey)
+			return MNL_CB_ERROR;
+		memcpy(*pubkey->pubkey, mnl_attr_get_payload(attr), *pubkey->pubkey_len);
+		break;
+	}
+
+	return MNL_CB_OK;
+}
+
+static int read_pubkey_cb(const struct nlmsghdr *nlh, void *data)
+{
+	return mnl_attr_parse(nlh, sizeof(struct genlmsghdr), parse_pubkey, data);
+}
+
+static int kernel_derive_pubkey(const uint8_t *privkey, size_t privkey_len, uint8_t **pubkey, size_t *pubkey_len)
+{
+	int ret;
+	struct nlmsghdr *nlh;
+	struct mnlg_socket *nlg;
+	struct wgnl_pubkey_args pubkey_args = {
+		.pubkey = pubkey,
+		.pubkey_len = pubkey_len
+	};
+
+	*pubkey = NULL;
+	*pubkey_len = 0;
+
+try_again:
+	ret = 0;
+
+	nlg = mnlg_socket_open(WG_GENL_NAME, WG_GENL_VERSION);
+	if (!nlg) {
+		return -errno;
+	}
+
+	nlh = mnlg_msg_prepare(nlg, WG_CMD_DERIVE_PUBKEY, NLM_F_REQUEST | NLM_F_ACK);
+	mnl_attr_put(nlh, WGDEVICE_A_PRIVATE_KEY, privkey_len, privkey);
+	if (mnlg_socket_send(nlg, nlh) < 0) {
+		ret = -errno;
+		goto out;
+	}
+	errno = 0;
+	if (mnlg_socket_recv_run(nlg, read_pubkey_cb, &pubkey_args) < 0) {
+		ret = errno ? -errno : -EINVAL;
+		goto out;
+	}
+
+out:
+	if (nlg)
+		mnlg_socket_close(nlg);
+	if (ret) {
+		if (*pubkey) {
+			free(*pubkey);
+			*pubkey = 0;
+		}
+		*pubkey_len = 0;
+		if (ret == -EINTR)
+			goto try_again;
+	}
+	errno = -ret;
+	return ret;
+}
+
+struct wgnl_psk_args {
+	uint8_t **psk;
+	size_t *psk_len;
+};
+
+static int parse_psk(const struct nlattr *attr, void *data)
+{
+	struct wgnl_psk_args *psk = data;
+
+	switch (mnl_attr_get_type(attr)) {
+	case WGDEVICE_A_PRESHARED_KEY:
+		*psk->psk_len = mnl_attr_get_payload_len(attr);
+		*psk->psk = malloc(*psk->psk_len);
+		if (! *psk->psk)
+			return MNL_CB_ERROR;
+		memcpy(*psk->psk, mnl_attr_get_payload(attr), *psk->psk_len);
+		break;
+	}
+
+	return MNL_CB_OK;
+}
+
+static int read_psk_cb(const struct nlmsghdr *nlh, void *data)
+{
+	return mnl_attr_parse(nlh, sizeof(struct genlmsghdr), parse_psk, data);
+}
+
+static int kernel_generate_psk(uint8_t **psk, size_t *psk_len)
+{
+	int ret;
+	struct nlmsghdr *nlh;
+	struct mnlg_socket *nlg;
+	struct wgnl_psk_args psk_args = {
+		.psk = psk,
+		.psk_len = psk_len
+	};
+
+	*psk = NULL;
+	*psk_len = 0;
+
+try_again:
+	ret = 0;
+
+	nlg = mnlg_socket_open(WG_GENL_NAME, WG_GENL_VERSION);
+	if (!nlg) {
+		return -errno;
+	}
+
+	nlh = mnlg_msg_prepare(nlg, WG_CMD_GEN_PSK, NLM_F_REQUEST | NLM_F_ACK);
+	if (mnlg_socket_send(nlg, nlh) < 0) {
+		ret = -errno;
+		goto out;
+	}
+	errno = 0;
+	if (mnlg_socket_recv_run(nlg, read_psk_cb, &psk_args) < 0) {
+		ret = errno ? -errno : -EINVAL;
+		goto out;
+	}
+
+out:
+	if (nlg)
+		mnlg_socket_close(nlg);
+	if (ret) {
+		if (*psk) {
+			memset(*psk, 0, *psk_len);
+			free(*psk);
+			*psk = 0;
+		}
+		*psk_len = 0;
+		if (ret == -EINTR)
+			goto try_again;
+	}
+	errno = -ret;
+	return ret;
+}
+
+#endif /* !NO_IPC_LLCRYPTO */

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 #
 # Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+#
+# Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
 
 PKG_CONFIG ?= pkg-config
 PREFIX ?= /usr
@@ -53,12 +55,19 @@ ifneq ($(WOLFGUARD_TOOLS_VERSION),)
 CFLAGS += -D'WOLFGUARD_TOOLS_VERSION="$(WOLFGUARD_TOOLS_VERSION)"'
 endif
 
+ifneq ($(PLATFORM),linux)
+NO_IPC_LLCRYPTO := 1
+endif
+
+ifdef NO_IPC_LLCRYPTO
+CFLAGS += -DNO_IPC_LLCRYPTO
 ifdef WOLFSSL_ROOT
 CFLAGS += -I$(WOLFSSL_ROOT)/include
 LDLIBS += -L$(WOLFSSL_ROOT)/lib -lwolfssl -Wl,-rpath=$(WOLFSSL_ROOT)/lib
 else
 CFLAGS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --cflags wolfssl)
 LDLIBS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --libs wolfssl)
+endif
 endif
 
 ifeq ($(PLATFORM),haiku)

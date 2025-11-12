@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ *
+ * Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #include <stddef.h>
@@ -9,9 +11,12 @@
 
 #include "subcommands.h"
 #include "version.h"
+#include "ipc.h" /* for IPC_SUPPORTS_KERNEL_INTERFACE */
 
+#if !defined(IPC_SUPPORTS_KERNEL_INTERFACE) || defined(NO_IPC_LLCRYPTO)
 #include <wolfssl/options.h>
 #include <wolfssl/wolfcrypt/random.h>
+#endif
 
 const char *PROG_NAME;
 
@@ -27,7 +32,7 @@ static const struct {
 	{ "addconf", setconf_main, "Appends a configuration file to a WolfGuard interface" },
 	{ "syncconf", setconf_main, "Synchronizes a configuration file to a WolfGuard interface" },
 	{ "genkey", genkey_main, "Generates a new private key and writes it to stdout" },
-	{ "genpsk", genkey_main, "Generates a new preshared key and writes it to stdout" },
+	{ "genpsk", genpsk_main, "Generates a new preshared key and writes it to stdout" },
 	{ "pubkey", pubkey_main, "Reads a private key from stdin and writes a public key to stdout" }
 };
 
@@ -53,8 +58,10 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
+#if !defined(IPC_SUPPORTS_KERNEL_INTERFACE) || defined(NO_IPC_LLCRYPTO)
 #ifdef WC_RNG_SEED_CB
         wc_SetSeed_Cb(wc_GenerateSeed);
+#endif
 #endif
 
 	if (argc == 1) {

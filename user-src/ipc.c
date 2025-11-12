@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ *
+ * Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
 #include "containers.h"
+#include "ipc.h"
 
 struct string_list {
 	char *buffer;
@@ -91,3 +94,34 @@ int ipc_set_device(struct wgdevice *dev)
 	return userspace_set_device(dev);
 #endif
 }
+
+#ifndef NO_IPC_LLCRYPTO
+
+int ipc_generate_privkey(uint8_t **privkey, size_t *privkey_len, uint8_t **pubkey, size_t *pubkey_len)
+{
+#ifdef IPC_SUPPORTS_KERNEL_INTERFACE
+	return kernel_generate_privkey(privkey, privkey_len, pubkey, pubkey_len);
+#else
+	return -ENODEV;
+#endif
+}
+
+int ipc_derive_pubkey(const uint8_t *privkey, size_t privkey_len, uint8_t **pubkey, size_t *pubkey_len)
+{
+#ifdef IPC_SUPPORTS_KERNEL_INTERFACE
+	return kernel_derive_pubkey(privkey, privkey_len, pubkey, pubkey_len);
+#else
+	return -ENODEV;
+#endif
+}
+
+int ipc_generate_psk(uint8_t **psk, size_t *psk_len)
+{
+#ifdef IPC_SUPPORTS_KERNEL_INTERFACE
+	return kernel_generate_psk(psk, psk_len);
+#else
+	return -ENODEV;
+#endif
+}
+
+#endif /* !NO_IPC_LLCRYPTO */

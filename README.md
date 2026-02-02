@@ -61,7 +61,7 @@ while those with `#` are to be executed with root privileges, but in the same
 established working directory context.
 
 Note that if a wolfSSL release archive is used in lieu of `git` sources, the
-release must be newer than 5.8.2.
+release must be version 5.8.4 or newer.
 
 
 ### Building and installing non-FIPS `git` sources
@@ -73,6 +73,7 @@ $ mkdir wolf-sources
 $ cd wolf-sources
 $ git clone https://github.com/wolfssl/wolfssl --branch nightly-snapshot
 $ git clone https://github.com/wolfssl/wolfguard
+$ (cd wolfssl && ./autogen.sh)
 ```
 
 (2) **Build and install the libwolfssl user library**:
@@ -83,11 +84,11 @@ performing them internally.
 
 ```
 $ cd wolfssl
-$ ./autogen.sh
-$ ./configure --enable-wolfguard --enable-all-asm
+$ ./configure --quiet --enable-wolfguard --enable-all-asm
 $ make -j
 $ ./wolfcrypt/test/testwolfcrypt
 # make install
+$ cd ..
 ```
 
 (3) **Build and install the `wg-fips` user tool** -- note, installation will move existing
@@ -95,16 +96,16 @@ WireGuard `wg` and `wg-quick` executables and man pages in the destination direc
 present) to `wg-wireguard` and `wg-wireguard-quick` respectively, and will
 install symbolic links for `wg` and `wg-quick` that point to the WolfGuard versions.
 ```
-$ cd ../wolfguard/user-src
+$ cd wolfguard/user-src
 $ make -j
-$ ./wg-fips genkey | ./wg-fips pubkey
 # make install
+$ cd ../..
 ```
 
 To force use of internal key ops on Linux, rather than the default offload to
 the kernel module, replace `make -j` with `make -j NO_IPC_LLCRYPTO=1`.
 
-Experimental support is available for compressed public keys, whose base64 exported lengths
+Support is available for compressed public keys, whose base64 exported lengths
 are the same as WireGuard Curve25519 public keys.  This can be enabled by substituting
 ```
 $ make -j EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION
@@ -120,8 +121,8 @@ configured and built, and precisely match the kernel you will boot on your
 target system.  The `modprobe` at the end assumes you are targeting the native
 running system.
 ```
-$ cd ../../wolfssl
-$ ./configure --enable-wolfguard --enable-cryptonly --enable-intelasm \
+$ cd wolfssl
+$ ./configure --quiet --enable-wolfguard --enable-cryptonly --enable-intelasm \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j module
@@ -133,7 +134,7 @@ Before you put the libwolfssl kernel module in production, you should build and
 load it with extended self-test enabled.  Replace the `./configure` recipe above
 with the following:
 ```
-$ ./configure --enable-wolfguard --enable-cryptonly --enable-intelasm \
+$ ./configure --quiet --enable-wolfguard --enable-cryptonly --enable-intelasm \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build --enable-crypttests \
    CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
@@ -145,17 +146,21 @@ that all algorithms function correctly.
 (5) **Build and install the WolfGuard kernel module.**  Again, replace
 `/usr/src/linux` with the path to your actual target kernel source tree, and
 replace `6.16.5-gentoo` with the actual value returned by `uname -r` on the
-target system.  And again, the `modprobe` at the end assumes you are targeting
+target system.  And again, the `modprobe` after the build assumes you are targeting
 the native running system.
 ```
 $ cd ../wolfguard/kernel-src
 $ make -j KERNELDIR=/usr/src/linux KERNELRELEASE=6.16.5-gentoo
 # make install
 # modprobe wolfguard
+$ ../user-src/wg-fips genkey | ../user-src/wg-fips pubkey
 ```
 
 The `KERNELRELEASE` value is, effectively, the verbatim name of the directory
 under `/lib/modules/` where the target kernel's modules are installed.
+
+The `genkey` and `pubkey` ops in the final line are basic functionality tests.
+If all is well, it will succeed, and print a random public key.
 
 As for the `wg-fips` build above, compressed public key support can be enabled
 by adding `EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION` to the above `make`
@@ -196,12 +201,13 @@ performing them internally.
 
 ```
 $ cd wolfssl
-$ ./configure --enable-fips=vX --enable-wolfguard
+$ ./configure --quiet --enable-fips=vX --enable-wolfguard
 $ make -j
 $ ./fips-hash.sh
 $ make -j
 $ ./wolfcrypt/test/testwolfcrypt
 # make install
+$ cd ..
 ```
 
 Note, the argument to `--enable-fips`
@@ -213,10 +219,10 @@ WireGuard `wg` and `wg-quick` executables and man pages in the destination direc
 present) to `wg-wireguard` and `wg-wireguard-quick` respectively, and will
 install symbolic links for `wg` and `wg-quick` that point to the WolfGuard versions.
 ```
-$ cd ../wolfguard/user-src
+$ cd wolfguard/user-src
 $ make -j
-$ ./wg-fips genkey | ./wg-fips pubkey
 # make install
+$ cd ../..
 ```
 
 To force use of internal key ops on Linux, rather than the default offload to
@@ -234,8 +240,8 @@ will rebuild and load the module with the correct hash.  Note that these
 instructions assume targeting the native system.  Note also that the lowest
 libwolfssl FIPS version compatible with Linux kernel mode is `v5.2.4`.
 ```
-$ cd ../../wolfssl
-$ ./configure --enable-fips=vX --enable-wolfguard --enable-cryptonly \
+$ cd wolfssl
+$ ./configure --quiet --enable-fips=vX --enable-wolfguard --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build
 $ make -j module
@@ -266,7 +272,7 @@ Before you put the libwolfssl kernel module in production, you should build and
 load it with extended self-test enabled.  To do this, replace the `./configure`
 recipe above with the following:
 ```
-$ ./configure --enable-fips=vX --enable-wolfguard --enable-cryptonly \
+$ ./configure --quiet --enable-fips=vX --enable-wolfguard --enable-cryptonly \
    --enable-linuxkm --with-linux-source=/usr/src/linux \
    --prefix=$(pwd)/linuxkm/build --enable-crypttests \
    CFLAGS=-DWOLFSSL_LINUXKM_VERBOSE_DEBUG
@@ -284,7 +290,11 @@ $ cd ../wolfguard/kernel-src
 $ make -j KERNELDIR=/usr/src/linux KERNELRELEASE=6.16.5-gentoo
 # make install
 # modprobe wolfguard
+$ ../user-src/wg-fips genkey | ../user-src/wg-fips pubkey
 ```
+
+The `genkey` and `pubkey` ops in the final line are basic functionality tests.
+If all is well, it will succeed, and print a random public key.
 
 As with the non-FIPS-certified procedure, if all of the above succeeds, then you
 are now ready to bring up WolfGuard tunnels.  Existing playbooks and scripting

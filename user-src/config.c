@@ -511,7 +511,8 @@ error:
 bool config_read_line(struct config_ctx *ctx, const char *input)
 {
 	size_t len, cleaned_len = 0;
-	char *line, *comment;
+	char *line;
+	const char *comment;
 	bool ret = true;
 
 	/* This is what strchrnul is for, but that isn't portable. */

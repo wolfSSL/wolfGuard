@@ -384,8 +384,15 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	if (!wg->incoming_handshakes_worker)
 		goto err_free_tstats;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
+	/* see 27ce71e1ce.  actually defined by 6.17.8, but don't bother with
+         * that.
+         */
+	#define WQ_PERCPU 0
+#endif
+
 	wg->handshake_receive_wq = alloc_workqueue("wg-kex-%s",
-			WQ_CPU_INTENSIVE | WQ_FREEZABLE, 0, dev->name);
+			WQ_CPU_INTENSIVE | WQ_FREEZABLE | WQ_PERCPU, 0, dev->name);
 	if (!wg->handshake_receive_wq)
 		goto err_free_incoming_handshakes;
 
@@ -395,7 +402,7 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 		goto err_destroy_handshake_receive;
 
 	wg->packet_crypt_wq = alloc_workqueue("wg-crypt-%s",
-			WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM, 0, dev->name);
+			WQ_CPU_INTENSIVE | WQ_MEM_RECLAIM | WQ_PERCPU, 0, dev->name);
 	if (!wg->packet_crypt_wq)
 		goto err_destroy_handshake_send;
 
@@ -412,6 +419,11 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	ret = wg_ratelimiter_init();
 	if (ret < 0)
 		goto err_free_decrypt_queue;
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 17, 0)
+        /* see db9ae3b6b4 and 78afdadafe. */
+        netif_threaded_enable(dev);
+#endif
 
 	ret = register_netdevice(dev);
 	if (ret < 0)

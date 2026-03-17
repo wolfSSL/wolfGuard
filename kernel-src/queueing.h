@@ -117,18 +117,14 @@ static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 	skb_reset_inner_headers(skb);
 }
 
+/* backport from 5bd8de2077 */
 static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
 {
-	unsigned int cpu = *stored_cpu, cpu_index, i;
+	unsigned int cpu = *stored_cpu;
 
-	if (unlikely(cpu == nr_cpumask_bits ||
-		     !cpumask_test_cpu(cpu, cpu_online_mask))) {
-		cpu_index = id % cpumask_weight(cpu_online_mask);
-		cpu = cpumask_first(cpu_online_mask);
-		for (i = 0; i < cpu_index; ++i)
-			cpu = cpumask_next(cpu, cpu_online_mask);
-		*stored_cpu = cpu;
-	}
+	while (unlikely(cpu >= nr_cpu_ids || !cpu_online(cpu)))
+		cpu = *stored_cpu = cpumask_nth(id % num_online_cpus(), cpu_online_mask);
+
 	return cpu;
 }
 
@@ -139,13 +135,13 @@ static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
  * a bit slower, and it doesn't seem like this potential race actually
  * introduces any performance loss, so we live with it.
  */
-static inline int wg_cpumask_next_online(int *next)
+/* backport from 5551d21284 */
+static inline int wg_cpumask_next_online(int *last_cpu)
 {
-	int cpu = *next;
-
-	while (unlikely(!cpumask_test_cpu(cpu, cpu_online_mask)))
-		cpu = cpumask_next(cpu, cpu_online_mask) % nr_cpumask_bits;
-	*next = cpumask_next(cpu, cpu_online_mask) % nr_cpumask_bits;
+	int cpu = cpumask_next(READ_ONCE(*last_cpu), cpu_online_mask);
+	if (cpu >= nr_cpu_ids)
+		cpu = cpumask_first(cpu_online_mask);
+	WRITE_ONCE(*last_cpu, cpu);
 	return cpu;
 }
 

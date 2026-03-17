@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+ * Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #ifndef WOLFCRYPTO_SHIM_H

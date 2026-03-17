@@ -22,7 +22,12 @@ struct wg_device;
 
 struct endpoint {
 	union {
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
+		/* see 463deed517 and 9203e0a82c */
+		struct sockaddr_inet addr;
+	#else
 		struct sockaddr addr;
+	#endif
 		struct sockaddr_in addr4;
 		struct sockaddr_in6 addr6;
 	};

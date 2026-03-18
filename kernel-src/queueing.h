@@ -117,6 +117,7 @@ static inline void wg_reset_packet(struct sk_buff *skb, bool encapsulating)
 	skb_reset_inner_headers(skb);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0)
 /* backport from 5bd8de2077 */
 static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
 {
@@ -127,6 +128,22 @@ static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
 
 	return cpu;
 }
+#else
+static inline int wg_cpumask_choose_online(int *stored_cpu, unsigned int id)
+{
+	unsigned int cpu = *stored_cpu, cpu_index, i;
+
+	if (unlikely(cpu == nr_cpumask_bits ||
+		     !cpumask_test_cpu(cpu, cpu_online_mask))) {
+		cpu_index = id % cpumask_weight(cpu_online_mask);
+		cpu = cpumask_first(cpu_online_mask);
+		for (i = 0; i < cpu_index; ++i)
+			cpu = cpumask_next(cpu, cpu_online_mask);
+		*stored_cpu = cpu;
+	}
+	return cpu;
+}
+#endif
 
 /* This function is racy, in the sense that next is unlocked, so it could return
  * the same CPU twice. A race-free version of this would be to instead store an

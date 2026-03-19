@@ -57,8 +57,8 @@ int __init wg_noise_init(void)
 
 	if (ret != 0) {
 		pr_err("ERROR: wg_noise_init() failed with code %d.\n", ret);
-                return -EINVAL;
-        }
+		return -EINVAL;
+	}
 
         return 0;
 }
@@ -478,15 +478,18 @@ static int mix_hash(u8 hash[NOISE_HASH_LEN], const u8 *src, size_t src_len)
 	int ret;
 
 	ret = wc_InitSha256(&sha);
+	if (ret != 0)
+	    WC_DEBUG_PR_NEG_RET(ret);
 
-	if (ret == 0)
-		ret = wc_Sha256Update(&sha, hash, NOISE_HASH_LEN);
+	ret = wc_Sha256Update(&sha, hash, NOISE_HASH_LEN);
 
 	if (ret == 0)
 		ret = wc_Sha256Update(&sha, src, src_len);
 
 	if (ret == 0)
 		ret = wc_Sha256Final(&sha, hash);
+
+	wc_Sha256Free(&sha);
 
 	WC_DEBUG_PR_NEG_RET(ret);
 }

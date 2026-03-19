@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
 #
-# Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+# Portions Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>
 
 
 KERNELRELEASE ?= $(shell uname -r)
@@ -28,7 +28,7 @@ endif
 WOLFGUARD_VERSION = $(patsubst v%,%,$(shell GIT_CEILING_DIRECTORIES="$(MODULE_TOP)/../.." git describe --dirty 2>/dev/null))
 
 module:
-	@$(MAKE) -C $(KERNELDIR) M=$(MODULE_TOP) WOLFGUARD_VERSION="$(WOLFGUARD_VERSION)" $(EXTRA_KBUILD_ARGS) modules
+	@$(MAKE) -C $(KERNELDIR) M=$(MODULE_TOP) WOLFGUARD_VERSION="$(WOLFGUARD_VERSION)" $(EXTRA_KBUILD_ARGS)
 
 module-debug:
 	@$(MAKE) -C $(KERNELDIR) M=$(MODULE_TOP) V=1 CONFIG_WOLFGUARD_DEBUG=y WOLFGUARD_VERSION="$(WOLFGUARD_VERSION)" $(EXTRA_KBUILD_ARGS) modules

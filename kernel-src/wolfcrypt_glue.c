@@ -1,14 +1,25 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+ * Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #include <crypto/scatterwalk.h>
 #include <linux/random.h>
+#include <crypto/internal/rng.h>
 #include "wolfcrypt_glue.h"
 
 #if defined(WG_USE_PUBLIC_KEY_COMPRESSION) && !defined(HAVE_COMP_KEY)
 	#error WG_USE_PUBLIC_KEY_COMPRESSION requires HAVE_COMP_KEY
+#endif
+
+#ifdef WC_DRBG_BANKREF
+
+#include <crypto/rng.h>
+
+#else
+
+static struct wc_rng_inst *get_drbg(struct wc_linuxkm_drbg_ctx *ctx);
+static void put_drbg(struct wc_rng_inst *drbg);
 #endif
 
 int wc_hmac_oneshot_prealloc(struct Hmac *wc_hmac, const int type, byte *out, const size_t out_space, const byte *message,
@@ -461,7 +472,11 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,
                              const int curve_id, int compressed)
 {
-        struct wc_rng_inst *rng = NULL;
+#ifndef WC_DRBG_BANKREF
+        struct wc_rng_inst *rng_inst = NULL;
+#endif
+        WC_RNG *rng = NULL;
+
         ecc_key *key = NULL;
         int key_inited = 0;
         int ret;
@@ -482,14 +497,21 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
             goto out;
         key_inited = 1;
 
-        rng = get_drbg(&wc_wg_drbg);
-        if (! rng) {
+#ifdef WC_DRBG_BANKREF
+        ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
+        if (ret)
+            goto out;
+#else
+        rng_inst = get_drbg(&wc_wg_drbg);
+        if (! rng_inst) {
             ret = SYSLIB_FAILED_E;
             goto out;
         }
+        rng = &rng_inst->rng;
+#endif
 
         ret = wc_ecc_make_key_ex(
-            &rng->rng,
+            rng,
             0 /* keysize -- use curve_id to designate the curve. */,
             key,
             curve_id);
@@ -532,8 +554,12 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
 
 out:
 
-        if (rng)
-            put_drbg(rng);
+#ifdef WC_DRBG_BANKREF
+        wc_rng_free(rng);
+#else
+        if (rng_inst)
+            put_drbg(rng_inst);
+#endif
         if (key) {
             if (key_inited)
                 wc_ecc_free(key);
@@ -573,15 +599,31 @@ int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
             goto out;
 
         {
-            struct wc_rng_inst *rng = get_drbg(&wc_wg_drbg);
-            if (! rng) {
+#ifndef WC_DRBG_BANKREF
+            struct wc_rng_inst *rng_inst;
+#endif
+            WC_RNG *rng;
+
+#ifdef WC_DRBG_BANKREF
+            ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
+            if (ret)
+                goto out;
+#else
+            rng_inst = get_drbg(&wc_wg_drbg);
+            if (! rng_inst) {
                 ret = SYSLIB_FAILED_E;
                 goto out;
             }
+            rng = &rng_inst->rng;
+#endif
 
-            ret = wc_ecc_make_pub_ex(key, NULL /* pubOut */, &rng->rng);
+            ret = wc_ecc_make_pub_ex(key, NULL /* pubOut */, rng);
 
-            put_drbg(rng);
+#ifdef WC_DRBG_BANKREF
+            wc_rng_free(rng);
+#else
+            put_drbg(rng_inst);
+#endif
         }
 
         if (ret)
@@ -627,7 +669,10 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
     int privKey_inited = 0, pubKey_inited = 0;
     int ret;
 #ifdef ECC_TIMING_RESISTANT
-    struct wc_rng_inst *rng = NULL;
+#ifndef WC_DRBG_BANKREF
+    struct wc_rng_inst *rng_inst = NULL;
+#endif
+    WC_RNG *rng = NULL;
 #endif
 
     if ((secret_len > UINT_MAX) ||
@@ -656,15 +701,25 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
     pubKey_inited = 1;
 
 #ifdef ECC_TIMING_RESISTANT
-    rng = get_drbg(&wc_wg_drbg);
-    if (! rng) {
+#ifdef WC_DRBG_BANKREF
+    ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
+    if (ret) {
         ret = -EFAULT;
         goto out;
     }
-    ret = wc_ecc_set_rng(privKey, &rng->rng);
+#else
+    rng_inst = get_drbg(&wc_wg_drbg);
+    if (! rng_inst) {
+        ret = -EFAULT;
+        goto out;
+    }
+    rng = &rng_inst->rng;
+#endif
+
+    ret = wc_ecc_set_rng(privKey, rng);
     if (ret != 0)
         goto out;
-#endif
+#endif /* ECC_TIMING_RESISTANT */
 
     ret = wc_ecc_import_private_key_ex(private, (word32)private_len,
                                        NULL, 0, privKey, curve_id);
@@ -687,10 +742,13 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
 out:
 
 #ifdef ECC_TIMING_RESISTANT
-        if (rng)
-            put_drbg(rng);
+#ifdef WC_DRBG_BANKREF
+        wc_rng_free(rng);
+#else
+        if (rng_inst)
+            put_drbg(rng_inst);
 #endif
-
+#endif
         if (privKey) {
             if (privKey_inited)
                 wc_ecc_free(privKey);
@@ -705,6 +763,231 @@ out:
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
+#ifdef WC_DRBG_BANKREF
+
+struct wc_rng_bank *wc_wg_drbg;
+static int wc_wg_drbg_is_global_default;
+
+static int linuxkm_affinity_lock(void *arg) {
+    (void)arg;
+    if (preempt_count() != 0)
+        return ALREADY_E;
+#if defined(CONFIG_SMP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
+    migrate_disable(); /* this actually makes irq_count() nonzero, so that
+                        * DISABLE_VECTOR_REGISTERS() is superfluous, but
+                        * don't depend on that.
+                        */
+#endif
+    local_bh_disable();
+    return 0;
+}
+
+static int linuxkm_affinity_get_id(void *arg, int *id) {
+    (void)arg;
+    *id = raw_smp_processor_id();
+    return 0;
+}
+
+static int linuxkm_affinity_unlock(void *arg) {
+    (void)arg;
+    local_bh_enable();
+#if defined(CONFIG_SMP) && (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
+    migrate_enable();
+#endif
+    return 0;
+}
+
+int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx) {
+    int ret;
+
+#ifdef LINUXKM_LKCAPI_REGISTER_HASH_DRBG_DEFAULT
+
+    struct crypto_rng *current_crypto_default_rng;
+
+    ret = crypto_get_default_rng();
+    if (ret != 0)
+        goto new_bank;
+
+    current_crypto_default_rng = crypto_default_rng;
+
+    if (current_crypto_default_rng == NULL) {
+        crypto_put_default_rng();
+        goto new_bank;
+    }
+
+    if (! wc_linux_kernel_rng_is_wolfcrypt(current_crypto_default_rng)) {
+        crypto_put_default_rng();
+        goto new_bank;
+    }
+
+    *ctx = (struct wc_rng_bank *)crypto_rng_ctx(current_crypto_default_rng);
+    wc_wg_drbg_is_global_default = 1;
+
+    return 0;
+
+new_bank:
+
+#endif /* LINUXKM_LKCAPI_REGISTER_HASH_DRBG_DEFAULT */
+
+    wc_wg_drbg_is_global_default = 0;
+    ret = wc_rng_bank_new(
+        ctx,
+        nr_cpu_ids + 4,
+        WC_RNG_BANK_FLAG_NO_VECTOR_OPS,
+        30 /* timeout_secs */,
+        NULL /* heap */,
+        INVALID_DEVID);
+
+    if (ret == 0) {
+        ret = wc_rng_bank_set_affinity_handlers(
+            *ctx,
+            linuxkm_affinity_lock,
+            linuxkm_affinity_get_id,
+            linuxkm_affinity_unlock,
+            NULL);
+        if (ret != 0) {
+            (void)wc_rng_bank_free(ctx);
+            pr_err("ERROR: wc_rng_bank_set_affinity_handlers() in wc_linuxkm_drbg_init_ctx() returned err %d\n", ret);
+            WC_DUMP_BACKTRACE_NONDEBUG;
+        }
+    }
+
+    return (ret == 0) ? ret : -ECANCELED;
+}
+
+void wc_linuxkm_drbg_ctx_clear(struct wc_rng_bank **ctx) {
+    if ((ctx == NULL) || (*ctx == NULL))
+        return;
+
+#ifdef LINUXKM_LKCAPI_REGISTER_HASH_DRBG_DEFAULT
+    if (wc_wg_drbg_is_global_default) {
+        *ctx = NULL;
+        wc_wg_drbg_is_global_default = 0;
+        crypto_put_default_rng();
+    }
+    else
+#endif
+        (void)wc_rng_bank_free(ctx);
+}
+
+static struct wc_rng_bank_inst *linuxkm_get_drbg(struct wc_rng_bank *ctx) {
+    int err;
+    struct wc_rng_bank_inst *ret;
+    word32 flags =
+        WC_RNG_BANK_FLAG_CAN_FAIL_OVER_INST |
+        WC_RNG_BANK_FLAG_CAN_WAIT |
+        WC_RNG_BANK_FLAG_PREFER_AFFINITY_INST |
+        WC_RNG_BANK_FLAG_NO_VECTOR_OPS;
+
+    err = wc_rng_bank_checkout(ctx, &ret, 0, 30 /* timeout_secs */, flags);
+
+    if (err != 0) {
+        pr_err("ERROR: wc_rng_bank_checkout() in linuxkm_get_drbg() returned err %d.\n", err);
+        WC_DUMP_BACKTRACE_NONDEBUG;
+        return NULL;
+    }
+
+    return ret;
+}
+
+static void linuxkm_put_drbg(struct wc_rng_bank *ctx, struct wc_rng_bank_inst **drbg) {
+    int ret = wc_rng_bank_checkin(ctx, drbg);
+    if (ret != 0) {
+        pr_err("ERROR: wc_rng_bank_checkin() in linuxkm_put_drbg() returned err %d.\n", ret);
+        WC_DUMP_BACKTRACE_NONDEBUG;
+    }
+}
+
+int wc_linuxkm_drbg_generate(struct wc_rng_bank **ctx,
+                        const u8 *src, unsigned int slen,
+                        u8 *dst, unsigned int dlen,
+                        int nofail_p)
+{
+    int ret, retried = 0;
+    struct wc_rng_bank_inst *drbg;
+
+    (void)nofail_p;
+
+    if ((ctx == NULL) || (*ctx == NULL)) {
+        pr_err_once("BUG: linuxkm_get_drbg() called with null ctx.");
+        return -EFAULT;
+    }
+
+    drbg = linuxkm_get_drbg(*ctx);
+
+    if (! drbg) {
+        pr_err_once("BUG: linuxkm_get_drbg() failed.");
+        return -EFAULT;
+    }
+
+    if (slen > 0) {
+        ret = wc_RNG_DRBG_Reseed(WC_RNG_BANK_INST_TO_RNG(drbg), src, slen);
+        if (ret != 0) {
+            pr_warn_once("WARNING: wc_RNG_DRBG_Reseed returned %d\n",ret);
+            ret = -EINVAL;
+            goto out;
+        }
+    }
+
+    for (;;) {
+        #define RNG_MAX_BLOCK_LEN_ROUNDED (RNG_MAX_BLOCK_LEN & ~0xfU)
+        if (dlen > RNG_MAX_BLOCK_LEN_ROUNDED) {
+            ret = wc_RNG_GenerateBlock(WC_RNG_BANK_INST_TO_RNG(drbg), dst, RNG_MAX_BLOCK_LEN_ROUNDED);
+            if (ret == 0) {
+                dlen -= RNG_MAX_BLOCK_LEN_ROUNDED;
+                dst += RNG_MAX_BLOCK_LEN_ROUNDED;
+            }
+        }
+        #undef RNG_MAX_BLOCK_LEN_ROUNDED
+        else {
+            ret = wc_RNG_GenerateBlock(WC_RNG_BANK_INST_TO_RNG(drbg), dst, dlen);
+            if (ret == 0)
+                dlen = 0;
+        }
+
+        if (dlen == 0)
+            break;
+
+        if (ret == 0)
+            continue;
+
+        if (unlikely(ret == WC_NO_ERR_TRACE(RNG_FAILURE_E)) && (! retried)) {
+            if (slen > 0)
+                break;
+
+            retried = 1;
+
+            ret = wc_rng_bank_inst_reinit(*ctx,
+                                          drbg,
+                                          30 /* timeout_secs */,
+                                          WC_RNG_BANK_FLAG_CAN_WAIT);
+
+            if (ret == 0) {
+                pr_warn("WARNING: reinitialized DRBG #%d after RNG_FAILURE_E from wc_RNG_GenerateBlock().", raw_smp_processor_id());
+                continue;
+            }
+            else {
+                pr_warn_once("ERROR: reinitialization of DRBG #%d after RNG_FAILURE_E failed with ret %d.", raw_smp_processor_id(), ret);
+                ret = -EINVAL;
+                break;
+            }
+        }
+        else {
+            pr_warn_once("ERROR: wc_linuxkm_drbg_generate() wc_RNG_GenerateBlock returned %d.\n",ret);
+            ret = -EINVAL;
+            break;
+        }
+    }
+
+out:
+
+    linuxkm_put_drbg(*ctx, &drbg);
+
+    return ret;
+}
+
+
+#else /* !WC_DRBG_BANKREF */
 /* snarfed from wolfssl/linuxkm/lkcapi_sha_glue.c */
 struct wc_linuxkm_drbg_ctx wc_wg_drbg;
 
@@ -825,31 +1108,6 @@ struct wc_rng_inst *get_drbg(struct wc_linuxkm_drbg_ctx *ctx) {
     __builtin_unreachable();
 }
 
-/* get_drbg_n() is used by bulk seed, mix-in, and reseed operations.  It expects
- * the caller to be able to wait until the requested DRBG is available.
- */
-struct wc_rng_inst *get_drbg_n(struct wc_linuxkm_drbg_ctx *ctx, int n) {
-    int can_sleep = (preempt_count() == 0);
-
-    for (;;) {
-        int expected = 0;
-        if (likely(__atomic_compare_exchange_n(&ctx->rngs[n].lock, &expected, 1, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE))) {
-            struct wc_rng_inst *drbg = &ctx->rngs[n];
-            drbg->disabled_vec_ops = 0;
-            return drbg;
-        }
-        if (can_sleep) {
-            if (signal_pending(current))
-                return NULL;
-            cond_resched();
-        }
-        else
-            cpu_relax();
-    }
-
-    __builtin_unreachable();
-}
-
 void put_drbg(struct wc_rng_inst *drbg) {
     #if defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT_COUNT) && \
         (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
@@ -955,62 +1213,4 @@ out:
     return 0;
 }
 
-#if !defined(HAVE_FIPS) || FIPS_VERSION_GE(6,0)
-int wc_linuxkm_drbg_seed(struct wc_linuxkm_drbg_ctx *ctx,
-                        const u8 *seed, unsigned int slen)
-{
-    u8 *seed_copy = NULL;
-    int ret;
-    int n;
-
-    if (slen == 0)
-        return 0;
-
-    seed_copy = (u8 *)malloc(slen + 2);
-    if (! seed_copy)
-        WC_DEBUG_PR_NEG_RET(-ENOMEM);
-    XMEMCPY(seed_copy + 2, seed, slen);
-
-    /* this iteration counts down, whereas the iteration in get_drbg() counts
-     * up, to assure they can't possibly phase-lock to each other.
-     */
-    for (n = ctx->n_rngs - 1; n >= 0; --n) {
-        struct wc_rng_inst *drbg = get_drbg_n(ctx, n);
-
-        if (! drbg) {
-            ret = -EINTR;
-            break;
-        }
-
-        /* perturb the seed with the CPU ID, so that no DRBG has the exact same
-         * seed.
-         */
-        seed_copy[0] = (u8)(n >> 8);
-        seed_copy[1] = (u8)n;
-
-        {
-            /* for the default RNG, make sure we don't cache an underlying SHA256
-             * method that uses vector insns (forbidden from irq handlers).
-             */
-            int need_fpu_restore = (DISABLE_VECTOR_REGISTERS() == 0);
-            ret = wc_RNG_DRBG_Reseed(&drbg->rng, seed_copy, slen + 2);
-            if (need_fpu_restore)
-                REENABLE_VECTOR_REGISTERS();
-        }
-
-        if (ret != 0) {
-            pr_warn_once("WARNING: wc_RNG_DRBG_Reseed returned %d\n",ret);
-            ret = -EINVAL;
-        }
-
-        put_drbg(drbg);
-
-        if (ret != 0)
-            break;
-    }
-
-    free(seed_copy);
-
-    WC_DEBUG_PR_NEG_RET(ret);
-}
-#endif
+#endif /* !WC_DRBG_BANKREF */

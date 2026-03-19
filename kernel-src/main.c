@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  *
- * Portions Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+ * Portions Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #include "version.h"
@@ -46,7 +46,7 @@ static int __init mod_init(void)
 
 	pr_info("WolfGuard " WOLFGUARD_VERSION " loaded.  Contact info@wolfssl.com for information.\n");
 	pr_info("WireGuard Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.\n");
-	pr_info("WolfGuard Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>\n");
+	pr_info("WolfGuard Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>\n");
 
 	return 0;
 

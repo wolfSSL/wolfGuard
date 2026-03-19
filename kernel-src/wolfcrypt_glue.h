@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2020-2025 wolfSSL Inc. <info@wolfssl.com>
+ * Copyright (C) 2020-2026 wolfSSL Inc. <info@wolfssl.com>
  */
 
 #ifndef WOLFCRYPTO_SHIM_H
@@ -26,6 +26,9 @@
 #include <wolfssl/wolfcrypt/hmac.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/random.h>
+#if __has_include(<wolfssl/wolfcrypt/rng_bank.h>)
+    #include <wolfssl/wolfcrypt/rng_bank.h>
+#endif
 
 #ifndef WOLFSSL_LINUXKM
     #error libwolfssl configured without --enable-linuxkm
@@ -210,6 +213,18 @@ extern bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len
                                          const u8 *key,
                                          const size_t key_len);
 
+#ifdef WC_DRBG_BANKREF
+
+extern struct wc_rng_bank *wc_wg_drbg;
+int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx);
+void wc_linuxkm_drbg_ctx_clear(struct wc_rng_bank **ctx);
+int wc_linuxkm_drbg_generate(struct wc_rng_bank **ctx,
+                             const u8 *src, unsigned int slen,
+                             u8 *dst, unsigned int dlen,
+                             int nofail_p);
+
+#else /* !WC_DRBG_BANKREF */
+
 /* snarfed from wolfssl/linuxkm/lkcapi_sha_glue.c */
 struct wc_linuxkm_drbg_ctx {
     size_t n_rngs;
@@ -222,17 +237,14 @@ struct wc_linuxkm_drbg_ctx {
     } *rngs; /* one per CPU ID */
 };
 extern struct wc_linuxkm_drbg_ctx wc_wg_drbg;
-int wc_linuxkm_drbg_init_ctx(struct wc_linuxkm_drbg_ctx *ctx);
-void wc_linuxkm_drbg_ctx_clear(struct wc_linuxkm_drbg_ctx * ctx);
-struct wc_rng_inst *get_drbg(struct wc_linuxkm_drbg_ctx *ctx);
-struct wc_rng_inst *get_drbg_n(struct wc_linuxkm_drbg_ctx *ctx, int n);
-void put_drbg(struct wc_rng_inst *drbg);
 int wc_linuxkm_drbg_generate(struct wc_linuxkm_drbg_ctx *ctx,
                              const u8 *src, unsigned int slen,
                              u8 *dst, unsigned int dlen,
                              int nofail_p);
-int wc_linuxkm_drbg_seed(struct wc_linuxkm_drbg_ctx *ctx,
-                         const u8 *seed, unsigned int slen);
+int wc_linuxkm_drbg_init_ctx(struct wc_linuxkm_drbg_ctx *ctx);
+void wc_linuxkm_drbg_ctx_clear(struct wc_linuxkm_drbg_ctx * ctx);
+
+#endif /* !WC_DRBG_BANKREF */
 
 int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,

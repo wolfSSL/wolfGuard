@@ -420,7 +420,7 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	if (ret < 0)
 		goto err_free_decrypt_queue;
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(6, 17, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
         /* see db9ae3b6b4 and 78afdadafe. */
         netif_threaded_enable(dev);
 #endif

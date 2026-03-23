@@ -54,8 +54,7 @@ int wg_cookie_checker_precompute_device_keys(struct cookie_checker *checker)
 		ret = precompute_key(checker->message_mac1_key,
 			       checker->device->static_identity.static_public,
 			       mac1_key_label);
-		if (ret)
-			return ret;
+                return ret;
 	} else {
 		memset(checker->cookie_encryption_key, 0,
 		       NOISE_SYMMETRIC_KEY_LEN);
@@ -97,7 +96,8 @@ static int compute_mac2(u8 mac2[COOKIE_LEN], const void *message, size_t len,
 {
 	len = len - sizeof(struct message_macs) +
 	      offsetof(struct message_macs, mac2);
-	return wc_sha256_oneshot(mac2, message, len);
+	return wc_hmac_oneshot(WC_SHA256, mac2, COOKIE_LEN, message, len, cookie,
+                               COOKIE_LEN);
 }
 
 static int make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
@@ -239,7 +239,7 @@ int wg_cookie_message_consume(struct message_handshake_cookie *src,
 {
 	struct wg_peer *peer = NULL;
 	u8 cookie[COOKIE_LEN];
-	bool ret;
+	int ret = 0;
 
 	if (unlikely(!wg_index_hashtable_lookup(wg->index_hashtable,
 						INDEX_HASHTABLE_HANDSHAKE |

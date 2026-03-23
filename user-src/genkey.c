@@ -96,17 +96,17 @@ int genkey_main(int argc, char *argv[])
 	privkey_base64 = (char *)malloc(privkey_base64_len);
 	if (! privkey_base64) {
 		fprintf(stderr, "malloc: %m\n");
+                ret = -ENOMEM;
 		goto out;
 	}
 
 	if (!wg_to_base64(privkey_base64, privkey_base64_len, privkey, privkey_len)) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
+                ret = -EINVAL;
 		goto out;
 	}
 
 	puts(privkey_base64);
-
-	ret = 0;
 
 out:
 
@@ -143,17 +143,17 @@ int genpsk_main(int argc, char *argv[])
 	psk_base64 = (char *)malloc(psk_base64_len);
 	if (! psk_base64) {
 		fprintf(stderr, "malloc: %m\n");
+                ret = -ENOMEM;
 		goto out;
 	}
 
 	if (!wg_to_base64(psk_base64, psk_base64_len, psk, psk_len)) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
+                ret = -EINVAL;
 		goto out;
 	}
 
 	puts(psk_base64);
-
-	ret = 0;
 
 out:
 
@@ -229,12 +229,11 @@ int genkey_main(int argc, char *argv[])
 
 	if (!wg_to_base64(exported_private_base64, sizeof(exported_private_base64), exported_private, sizeof(exported_private))) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
+                ret = -EINVAL;
 		goto out;
 	}
 
 	puts(exported_private_base64);
-
-	ret = 0;
 
 out:
 
@@ -276,12 +275,11 @@ int genpsk_main(int argc, char *argv[])
 
 	if (!wg_to_base64(psk_base64, sizeof(psk_base64), psk, sizeof psk)) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
+                ret = -EINVAL;
 		goto out;
 	}
 
 	puts(psk_base64);
-
-	ret = 0;
 
 out:
 

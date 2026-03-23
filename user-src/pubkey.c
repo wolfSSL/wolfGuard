@@ -24,7 +24,7 @@ int pubkey_main(int argc, char *argv[])
 	size_t pubkey_len;
 	char *pubkey_base64 = NULL;
 	size_t pubkey_base64_len;
-	int ret;
+	int ret = 1;
 
 	if (argc != 1) {
 		fprintf(stderr, "Usage: %s %s\n", PROG_NAME, argv[0]);
@@ -100,7 +100,7 @@ int pubkey_main(int argc, char *argv[])
 	char base64[WG_BASE64_LEN(WG_KEY_LEN_MAX)];
 	int trailing_char;
 	ecc_key key_ecc;
-	int key_ecc_inited;
+	int key_ecc_inited = 0;
 	WC_RNG rng;
 	int rng_inited = 0;
 	int ret = 1;
@@ -177,17 +177,17 @@ int pubkey_main(int argc, char *argv[])
 		}
 		if (outLen != WG_PUBLIC_KEY_LEN) {
 			fprintf(stderr, "wc_ecc_export_x963() returned unexpected key length %u.\n", outLen);
+                        ret = -EINVAL;
 			goto out;
 		}
 	}
 
 	if (!wg_to_base64(base64, WG_BASE64_LEN(WG_PUBLIC_KEY_LEN), key, WG_PUBLIC_KEY_LEN)) {
 		fprintf(stderr, "%s: wg_to_base64() failed for public key.\n", PROG_NAME);
+                ret = -EINVAL;
 		goto out;
 	}
 	puts(base64);
-
-	ret = 0;
 
 out:
 

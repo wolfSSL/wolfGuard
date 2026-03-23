@@ -319,7 +319,7 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 			else
 				dev->first_peer = new_peer;
 			peer = new_peer;
-			if (!wg_from_hex(dev->public_key, sizeof(dev->public_key), value, value_len))
+			if (!wg_from_hex(peer->public_key, sizeof(peer->public_key), value, value_len))
 				break;
 			peer->flags |= WGPEER_HAS_PUBLIC_KEY;
 		} else if (peer && !strcmp(key, "preshared_key")) {

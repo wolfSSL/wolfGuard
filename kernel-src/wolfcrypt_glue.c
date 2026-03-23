@@ -76,6 +76,8 @@ int wc_AesGcm_Appended_Tag_Encrypt(Aes* aes, byte* out, word32 out_space,
                                    const byte* authIn, word32 authIn_sz,
                                    const word32 authTag_len)
 {
+	if (out_space < authTag_len)
+		WC_DEBUG_PR_NEG_RET(-EINVAL);
 	if (out_space - authTag_len < in_sz)
 		WC_DEBUG_PR_NEG_RET(-ENOBUFS);
 
@@ -683,12 +685,16 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
     }
 
     privKey = (ecc_key *)malloc(sizeof(*privKey));
-    if (! privKey)
+    if (! privKey) {
+	ret = MEMORY_E;
         goto out;
+    }
 
     pubKey = (ecc_key *)malloc(sizeof(*pubKey));
-    if (! pubKey)
+    if (! pubKey) {
+	ret = MEMORY_E;
         goto out;
+    }
 
     ret = wc_ecc_init(privKey);
     if (ret != 0)

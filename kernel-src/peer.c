@@ -54,7 +54,7 @@ struct wg_peer *wg_peer_create(struct wg_device *wg,
 
 	ret = wg_cookie_checker_precompute_peer_keys(peer);
         if (ret)
-		goto err_3;
+		goto err_4;
 
 	spin_lock_init(&peer->keypairs.keypair_update_lock);
 	INIT_WORK(&peer->transmit_handshake_work,
@@ -81,6 +81,8 @@ struct wg_peer *wg_peer_create(struct wg_device *wg,
 	pr_debug("%s: Peer %llu created\n", wg->dev->name, peer->internal_id);
 	return peer;
 
+err_4:
+        wg_packet_queue_free(&peer->rx_queue, false);
 err_3:
 	wg_packet_queue_free(&peer->tx_queue, false);
 err_2:

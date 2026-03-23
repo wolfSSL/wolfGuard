@@ -250,7 +250,7 @@ static int wg_get_device_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		down_read(&wg->static_identity.lock);
 		if (wg->static_identity.has_identity) {
 			if (nla_put(skb, WGDEVICE_A_PRIVATE_KEY,
-				    NOISE_PUBLIC_KEY_LEN,
+				    NOISE_PRIVATE_KEY_LEN,
 				    wg->static_identity.static_private) ||
 			    nla_put(skb, WGDEVICE_A_PUBLIC_KEY,
 				    NOISE_PUBLIC_KEY_LEN,
@@ -588,9 +588,9 @@ static int wg_set_device(struct sk_buff *skb, struct genl_info *info)
 			wg_noise_expire_current_peer_keypairs(peer);
 		}
 		ret = wg_cookie_checker_precompute_device_keys(&wg->cookie_checker);
-                if (ret)
-                	goto out;
 		up_write(&wg->static_identity.lock);
+		if (ret)
+			goto out;
 	}
 skip_set_private_key:
 
@@ -702,7 +702,7 @@ static int wg_nl_derive_pubkey(struct sk_buff *skb, struct genl_info *info)
 	struct nlattr *priv_attr;
 	u8 *private; /* note, not const -- see below. */
 	u8 *public = NULL;
-	struct sk_buff *reply;
+	struct sk_buff *reply = NULL;
 	void *hdr = NULL;
 
 	if ((! skb) || (! info) || (! info->genlhdr))
@@ -774,7 +774,7 @@ static int wg_nl_generate_psk(struct sk_buff *skb, struct genl_info *info)
 {
 	int ret = -ENOMEM;
 	u8 *psk = NULL;
-	struct sk_buff *reply;
+	struct sk_buff *reply = NULL;
 	void *hdr = NULL;
 
 	if ((! skb) || (! info) || (! info->genlhdr))

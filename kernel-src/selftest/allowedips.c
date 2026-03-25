@@ -366,9 +366,9 @@ static __init bool randomized_test(void)
 				mutate_mask[k] = 0xff;
 			mutate_mask[k] = 0xff
 					 << ((8 - (mutate_amount % 8)) % 8);
-			for (; k < 4; ++k)
+			for (; k < 16; ++k)
 				mutate_mask[k] = 0;
-			for (k = 0; k < 4; ++k)
+			for (k = 0; k < 16; ++k)
 				mutated[k] = (mutated[k] & mutate_mask[k]) |
 					     (~mutate_mask[k] &
 					      wc_get_random_u32_below(256));

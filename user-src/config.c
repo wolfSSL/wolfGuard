@@ -108,7 +108,7 @@ err:
 static inline bool parse_private_key(uint8_t key[static WG_PRIVATE_KEY_LEN], const char *value, size_t value_len)
 {
 	if (!wg_from_base64(key, WG_PRIVATE_KEY_LEN, value, value_len)) {
-		fprintf(stderr, "Private key is not the correct length or format: `%s'\n", value);
+		fprintf(stderr, "Private key is not the correct length or format.\n");
 		memset(key, 0, WG_PRIVATE_KEY_LEN);
 		return false;
 	}
@@ -128,7 +128,7 @@ static inline bool parse_public_key(uint8_t key[static WG_PUBLIC_KEY_LEN], const
 static inline bool parse_preshared_key(uint8_t key[static WG_SYMMETRIC_KEY_LEN], const char *value, size_t value_len)
 {
 	if (!wg_from_base64(key, WG_SYMMETRIC_KEY_LEN, value, value_len)) {
-		fprintf(stderr, "Preshared key is not the correct length or format: `%s'\n", value);
+		fprintf(stderr, "Preshared key is not the correct length or format.\n");
 		memset(key, 0, WG_SYMMETRIC_KEY_LEN);
 		return false;
 	}
@@ -179,7 +179,10 @@ static bool parse_keyfile(uint8_t *key, size_t key_len, const char *path)
 	ret = wg_from_base64(key, key_len, dst, WG_BASE64_LEN(key_len) - 1);
 
 out:
-	free(dst);
+	if (dst) {
+		memset(dst, 0, WG_BASE64_LEN(key_len) - 1);
+		free(dst);
+	}
 	fclose(f);
 	return ret;
 }
@@ -384,6 +387,11 @@ static inline bool parse_allowedips(struct wgpeer *peer, struct wgallowedip **la
 		char *end, *ip;
 
 		saved_entry = strdup(mask);
+		if (!saved_entry) {
+			perror("strdup");
+			free(mutable);
+			return false;
+		}
 		ip = strsep(&mask, "/");
 
 		new_allowedip = calloc(1, sizeof(*new_allowedip));
@@ -598,7 +606,7 @@ struct wgdevice *config_read_cmd(char *argv[], int argc)
 
 	if (!device) {
 		perror("calloc");
-		return false;
+		return NULL;
 	}
 	while (argc > 0) {
 		if (!strcmp(argv[0], "listen-port") && argc >= 2 && !peer) {
@@ -675,5 +683,5 @@ struct wgdevice *config_read_cmd(char *argv[], int argc)
 	return device;
 error:
 	free_wgdevice(device);
-	return false;
+	return NULL;
 }

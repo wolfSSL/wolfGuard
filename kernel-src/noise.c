@@ -32,7 +32,7 @@ static u8 handshake_init_hash[NOISE_HASH_LEN] __ro_after_init;
 static u8 handshake_init_chaining_key[NOISE_HASH_LEN] __ro_after_init;
 static atomic64_t keypair_counter = ATOMIC64_INIT(0);
 
-int __init wg_noise_init(void)
+__must_check int __init wg_noise_init(void)
 {
 	wc_Sha256 sha;
 	int ret;
@@ -77,7 +77,7 @@ void wg_noise_precompute_static_static(struct wg_peer *peer)
 				       sizeof(peer->handshake.remote_static),
                                        NOISE_CURVE_ID) != 0))
 	{
-		memset(peer->handshake.precomputed_static_static, 0,
+		memzero_explicit(peer->handshake.precomputed_static_static,
 		       NOISE_PRIVATE_KEY_LEN);
 	}
 
@@ -107,10 +107,10 @@ void wg_noise_handshake_init(struct noise_handshake *handshake,
 
 static void handshake_zero(struct noise_handshake *handshake)
 {
-	memset(&handshake->ephemeral_private, 0, NOISE_PRIVATE_KEY_LEN);
-	memset(&handshake->remote_ephemeral, 0, NOISE_PUBLIC_KEY_LEN);
-	memset(&handshake->hash, 0, NOISE_HASH_LEN);
-	memset(&handshake->chaining_key, 0, NOISE_HASH_LEN);
+	memzero_explicit(&handshake->ephemeral_private, NOISE_PRIVATE_KEY_LEN);
+	memzero_explicit(&handshake->remote_ephemeral, NOISE_PUBLIC_KEY_LEN);
+	memzero_explicit(&handshake->hash, NOISE_HASH_LEN);
+	memzero_explicit(&handshake->chaining_key, NOISE_HASH_LEN);
 	handshake->remote_index = 0;
 	handshake->state = HANDSHAKE_ZEROED;
 }
@@ -340,7 +340,7 @@ void wg_noise_set_static_identity_private_key(
  *  - https://eprint.iacr.org/2010/264.pdf
  *  - https://tools.ietf.org/html/rfc5869
  */
-static int kdf(u8 *first_dst, u8 *second_dst, u8 *third_dst, const u8 *data,
+static int __must_check kdf(u8 *first_dst, u8 *second_dst, u8 *third_dst, const u8 *data,
 		size_t first_len, size_t second_len, size_t third_len,
 		size_t data_len, const u8 chaining_key[NOISE_HASH_LEN])
 {
@@ -409,6 +409,9 @@ static int kdf(u8 *first_dst, u8 *second_dst, u8 *third_dst, const u8 *data,
 	ret = wc_hmac_oneshot_prealloc(wc_hmac, WC_SHA256, output, sizeof(output), output,
 				       WC_SHA256_DIGEST_SIZE + 1, secret, WC_SHA256_DIGEST_SIZE);
 
+        if (ret != 0)
+		goto out;
+
 	memcpy(third_dst, output, third_len);
 
 out:
@@ -422,7 +425,7 @@ out:
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
-static int derive_keys(struct noise_symmetric_key *first_dst,
+static int __must_check derive_keys(struct noise_symmetric_key *first_dst,
 			struct noise_symmetric_key *second_dst,
 			const u8 chaining_key[NOISE_HASH_LEN])
 {
@@ -443,6 +446,7 @@ static bool __must_check mix_dh(u8 chaining_key[NOISE_HASH_LEN],
 				const u8 public[NOISE_PUBLIC_KEY_LEN])
 {
 	u8 dh_calculation[NOISE_PRIVATE_KEY_LEN];
+	bool ret;
 
 	if (wc_ecc_shared_secret_exim(dh_calculation, sizeof(dh_calculation),
 				      private, NOISE_PRIVATE_KEY_LEN,
@@ -450,10 +454,12 @@ static bool __must_check mix_dh(u8 chaining_key[NOISE_HASH_LEN],
                                       NOISE_CURVE_ID) != 0)
 		WC_DEBUG_PR_FALSE_RET(false);
 	if (kdf(chaining_key, key, NULL, dh_calculation, NOISE_HASH_LEN,
-		NOISE_SYMMETRIC_KEY_LEN, 0, NOISE_PRIVATE_KEY_LEN, chaining_key) != 0)
-		WC_DEBUG_PR_FALSE_RET(false);
+		NOISE_SYMMETRIC_KEY_LEN, 0, NOISE_PRIVATE_KEY_LEN, chaining_key) == 0)
+		ret = true;
+	else
+		ret = false;
 	memzero_explicit(dh_calculation, NOISE_PRIVATE_KEY_LEN);
-	return true;
+	WC_DEBUG_PR_FALSE_RET(ret);
 }
 
 static bool __must_check mix_precomputed_dh(u8 chaining_key[NOISE_HASH_LEN],
@@ -472,7 +478,7 @@ static bool __must_check mix_precomputed_dh(u8 chaining_key[NOISE_HASH_LEN],
 	return true;
 }
 
-static int mix_hash(u8 hash[NOISE_HASH_LEN], const u8 *src, size_t src_len)
+static int __must_check mix_hash(u8 hash[NOISE_HASH_LEN], const u8 *src, size_t src_len)
 {
 	wc_Sha256 sha;
 	int ret;
@@ -494,7 +500,7 @@ static int mix_hash(u8 hash[NOISE_HASH_LEN], const u8 *src, size_t src_len)
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
-static int mix_psk(u8 chaining_key[NOISE_HASH_LEN], u8 hash[NOISE_HASH_LEN],
+static int __must_check mix_psk(u8 chaining_key[NOISE_HASH_LEN], u8 hash[NOISE_HASH_LEN],
 		    u8 key[NOISE_SYMMETRIC_KEY_LEN],
 		    const u8 psk[NOISE_SYMMETRIC_KEY_LEN])
 {
@@ -509,7 +515,7 @@ static int mix_psk(u8 chaining_key[NOISE_HASH_LEN], u8 hash[NOISE_HASH_LEN],
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
-static int handshake_init(u8 chaining_key[NOISE_HASH_LEN],
+static int __must_check handshake_init(u8 chaining_key[NOISE_HASH_LEN],
 			   u8 hash[NOISE_HASH_LEN],
 			   const u8 remote_static[NOISE_PUBLIC_KEY_LEN])
 {
@@ -518,7 +524,7 @@ static int handshake_init(u8 chaining_key[NOISE_HASH_LEN],
 	WC_DEBUG_PR_NEG_RET(mix_hash(hash, remote_static, NOISE_PUBLIC_KEY_LEN));
 }
 
-static int message_encrypt(u8 *dst_ciphertext, size_t dst_ciphertext_space, const u8 *src_plaintext,
+static int __must_check message_encrypt(u8 *dst_ciphertext, size_t dst_ciphertext_space, const u8 *src_plaintext,
 			    size_t src_len, u8 key[NOISE_SYMMETRIC_KEY_LEN],
 			    u8 hash[NOISE_HASH_LEN])
 {
@@ -526,11 +532,12 @@ static int message_encrypt(u8 *dst_ciphertext, size_t dst_ciphertext_space, cons
 					    NULL /* iv */, 0,
 					    hash, NOISE_HASH_LEN, NOISE_AUTHTAG_LEN);
 	if (ret == 0)
-		mix_hash(hash, dst_ciphertext, noise_encrypted_len(src_len));
+		ret = mix_hash(hash, dst_ciphertext, noise_encrypted_len(src_len));
+
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
-static bool message_decrypt(u8 *dst_plaintext, size_t dst_plaintext_space, const u8 *src_ciphertext,
+static bool __must_check message_decrypt(u8 *dst_plaintext, size_t dst_plaintext_space, const u8 *src_ciphertext,
 			    size_t src_len, u8 key[NOISE_SYMMETRIC_KEY_LEN],
 			    u8 hash[NOISE_HASH_LEN])
 {
@@ -545,7 +552,7 @@ static bool message_decrypt(u8 *dst_plaintext, size_t dst_plaintext_space, const
 	return true;
 }
 
-static int message_ephemeral(u8 ephemeral_dst[NOISE_PUBLIC_KEY_LEN],
+static int __must_check message_ephemeral(u8 ephemeral_dst[NOISE_PUBLIC_KEY_LEN],
 			      const u8 ephemeral_src[NOISE_PUBLIC_KEY_LEN],
 			      u8 chaining_key[NOISE_HASH_LEN],
 			      u8 hash[NOISE_HASH_LEN])
@@ -596,18 +603,20 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 
 	dst->header.type = cpu_to_le32(MESSAGE_HANDSHAKE_INITIATION);
 
-	handshake_init(handshake->chaining_key, handshake->hash,
-		       handshake->remote_static);
+	if (handshake_init(handshake->chaining_key, handshake->hash,
+                           handshake->remote_static) != 0)
+		goto out;
 
 	/* e */
 	if (wc_ecc_make_keypair_exim(handshake->ephemeral_private, sizeof(handshake->ephemeral_private),
 				     dst->unencrypted_ephemeral, sizeof(dst->unencrypted_ephemeral),
 				     NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) != 0)
-	    goto out;
+		goto out;
 
-	message_ephemeral(dst->unencrypted_ephemeral,
-			  dst->unencrypted_ephemeral, handshake->chaining_key,
-			  handshake->hash);
+	if (message_ephemeral(dst->unencrypted_ephemeral,
+                              dst->unencrypted_ephemeral, handshake->chaining_key,
+                              handshake->hash) != 0)
+		goto out;
 
 	/* es */
 	if (!mix_dh(handshake->chaining_key, key, handshake->ephemeral_private,
@@ -615,9 +624,10 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 		goto out;
 
 	/* s */
-	message_encrypt(dst->encrypted_static, sizeof(dst->encrypted_static),
-			handshake->static_identity->static_public,
-			NOISE_PUBLIC_KEY_LEN, key, handshake->hash);
+	if (message_encrypt(dst->encrypted_static, sizeof(dst->encrypted_static),
+                            handshake->static_identity->static_public,
+                            NOISE_PUBLIC_KEY_LEN, key, handshake->hash) != 0)
+		goto out;
 
 	/* ss */
 	if (!mix_precomputed_dh(handshake->chaining_key, key,
@@ -626,8 +636,9 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 
 	/* {t} */
 	tai64n_now(timestamp);
-	message_encrypt(dst->encrypted_timestamp, sizeof(dst->encrypted_timestamp), timestamp,
-			NOISE_TIMESTAMP_LEN, key, handshake->hash);
+	if (message_encrypt(dst->encrypted_timestamp, sizeof(dst->encrypted_timestamp), timestamp,
+			    NOISE_TIMESTAMP_LEN, key, handshake->hash) != 0)
+		goto out;
 
 	dst->sender_index = wg_index_hashtable_insert(
 		handshake->entry.peer->device->index_hashtable,
@@ -663,10 +674,12 @@ wg_noise_handshake_consume_initiation(struct message_handshake_initiation *src,
 	if (unlikely(!wg->static_identity.has_identity))
 		goto out;
 
-	handshake_init(chaining_key, hash, wg->static_identity.static_public);
+	if (handshake_init(chaining_key, hash, wg->static_identity.static_public) != 0)
+		goto out;
 
 	/* e */
-	message_ephemeral(e, src->unencrypted_ephemeral, chaining_key, hash);
+	if (message_ephemeral(e, src->unencrypted_ephemeral, chaining_key, hash) != 0)
+		goto out;
 
 	/* es */
 	if (!mix_dh(chaining_key, key, wg->static_identity.static_private, e)) {
@@ -734,6 +747,7 @@ out:
 	memzero_explicit(key, NOISE_SYMMETRIC_KEY_LEN);
 	memzero_explicit(hash, NOISE_HASH_LEN);
 	memzero_explicit(chaining_key, NOISE_HASH_LEN);
+	memzero_explicit(s, NOISE_PUBLIC_KEY_LEN);
 	up_read(&wg->static_identity.lock);
 	if (!ret_peer)
 		wg_peer_put(peer);
@@ -761,9 +775,10 @@ bool wg_noise_handshake_create_response(struct message_handshake_response *dst,
 				     NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) != 0)
 		goto out;
 
-	message_ephemeral(dst->unencrypted_ephemeral,
-			  dst->unencrypted_ephemeral, handshake->chaining_key,
-			  handshake->hash);
+	if (message_ephemeral(dst->unencrypted_ephemeral,
+			      dst->unencrypted_ephemeral, handshake->chaining_key,
+			      handshake->hash) != 0)
+		goto out;
 
 	/* ee */
 	if (!mix_dh(handshake->chaining_key, NULL, handshake->ephemeral_private,
@@ -776,11 +791,14 @@ bool wg_noise_handshake_create_response(struct message_handshake_response *dst,
 		goto out;
 
 	/* psk */
-	mix_psk(handshake->chaining_key, handshake->hash, key,
-		handshake->preshared_key);
+	if (mix_psk(handshake->chaining_key, handshake->hash, key,
+		    handshake->preshared_key) != 0)
+		goto out;
 
 	/* {} */
-	message_encrypt(dst->encrypted_nothing, sizeof(dst->encrypted_nothing), NULL, 0, key, handshake->hash);
+	if (message_encrypt(dst->encrypted_nothing, sizeof(dst->encrypted_nothing),
+			    NULL, 0, key, handshake->hash) != 0)
+		goto out;
 
 	dst->sender_index = wg_index_hashtable_insert(
 		handshake->entry.peer->device->index_hashtable,
@@ -836,7 +854,8 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 		goto fail;
 
 	/* e */
-	message_ephemeral(e, src->unencrypted_ephemeral, chaining_key, hash);
+	if (message_ephemeral(e, src->unencrypted_ephemeral, chaining_key, hash) != 0)
+		goto out;
 
 	/* ee */
 	if (!mix_dh(chaining_key, NULL, ephemeral_private, e))
@@ -847,7 +866,8 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 		goto fail;
 
 	/* psk */
-	mix_psk(chaining_key, hash, key, preshared_key);
+	if (mix_psk(chaining_key, hash, key, preshared_key) != 0)
+		goto out;
 
 	/* {} */
 	if (!message_decrypt(NULL, 0, src->encrypted_nothing,
@@ -903,12 +923,16 @@ bool wg_noise_handshake_begin_session(struct noise_handshake *handshake,
 					  HANDSHAKE_CONSUMED_RESPONSE;
 	new_keypair->remote_index = handshake->remote_index;
 
-	if (new_keypair->i_am_the_initiator)
-		derive_keys(&new_keypair->sending, &new_keypair->receiving,
-			    handshake->chaining_key);
-	else
-		derive_keys(&new_keypair->receiving, &new_keypair->sending,
-			    handshake->chaining_key);
+	if (new_keypair->i_am_the_initiator) {
+		if (derive_keys(&new_keypair->sending, &new_keypair->receiving,
+				handshake->chaining_key) != 0)
+			goto out;
+        }
+	else {
+		if (derive_keys(&new_keypair->receiving, &new_keypair->sending,
+				handshake->chaining_key) != 0)
+			goto out;
+        }
 
 	handshake_zero(handshake);
 	rcu_read_lock_bh();

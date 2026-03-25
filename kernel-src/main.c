@@ -24,12 +24,15 @@ static int __init mod_init(void)
 
 	ret = wc_linuxkm_drbg_init_ctx(&wc_wg_drbg);
 	if (ret < 0)
-		goto err_device;
+		WC_DEBUG_PR_NEG_RET(ret);
 
 #ifdef DEBUG
 	if (!wg_allowedips_selftest() || !wg_packet_counter_selftest() ||
 	    !wg_ratelimiter_selftest())
-		return -ENOTRECOVERABLE;
+        {
+		ret = -ENOTRECOVERABLE;
+		goto err_device;
+        }
 #endif
 
 	ret = wg_noise_init();
@@ -52,7 +55,10 @@ static int __init mod_init(void)
 
 err_netlink:
 	wg_device_uninit();
+
 err_device:
+	wc_linuxkm_drbg_ctx_clear(&wc_wg_drbg);
+
 	return ret;
 }
 

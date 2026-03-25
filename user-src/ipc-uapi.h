@@ -86,7 +86,10 @@ static int userspace_set_device(struct wgdevice *dev)
 			continue;
 		}
 		if (peer->flags & WGPEER_HAS_PRESHARED_KEY) {
-			wg_to_hex(hex, WG_HEX_LEN(WG_SYMMETRIC_KEY_LEN), peer->preshared_key, sizeof(peer->preshared_key));
+			if (!wg_to_hex(hex, WG_HEX_LEN(WG_SYMMETRIC_KEY_LEN), peer->preshared_key, sizeof(peer->preshared_key))) {
+				ret = -EINVAL;
+				goto out;
+			}
 			if (fprintf(f, "preshared_key=%s\n", hex) < 0) {
 				ret = errno ? -errno : -EIO;
 				goto out;
@@ -151,9 +154,12 @@ static int userspace_set_device(struct wgdevice *dev)
 
 	if (fscanf(f, "errno=%d\n\n", &ret) != 1)
 		ret = errno ? -errno : -EPROTO;
+	else
+		ret = -ret;
 
 out:
 
+	memset(hex, 0, sizeof hex);
 	fclose(f);
 	errno = -ret;
 	return ret;
@@ -353,7 +359,7 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				*end++ = '\0';
 			}
 			if (getaddrinfo(begin, end, &hints, &resolved) != 0) {
-				ret = ENETUNREACH;
+				ret = -ENETUNREACH;
 				goto err;
 			}
 			if ((resolved->ai_family == AF_INET && resolved->ai_addrlen == sizeof(struct sockaddr_in)) ||

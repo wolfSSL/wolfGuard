@@ -48,7 +48,7 @@ int pubkey_main(int argc, char *argv[])
 		goto out;
 	}
 
-	if (!wg_from_base64(privkey, WG_PRIVATE_KEY_LEN, privkey_base64, sizeof privkey_base64)) {
+	if (!wg_from_base64(privkey, WG_PRIVATE_KEY_LEN, privkey_base64, WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1)) {
 		fprintf(stderr, "%s: wg_from_base64(): Key is not the correct length or format\n", PROG_NAME);
 		goto out;
 	}
@@ -56,7 +56,7 @@ int pubkey_main(int argc, char *argv[])
 	ret = ipc_derive_pubkey(privkey, sizeof privkey, &pubkey, &pubkey_len);
 	if (ret) {
 		fprintf(stderr, "ipc_derive_pubkey() failed: %s.\n", strerror(-ret));
-		return ret;
+		goto out;
 	}
 
 	pubkey_base64_len = WG_BASE64_LEN(pubkey_len);
@@ -69,18 +69,20 @@ int pubkey_main(int argc, char *argv[])
 	if (!wg_to_base64(pubkey_base64, pubkey_base64_len, pubkey, pubkey_len)) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
 		goto out;
-        }
+	}
 
 	puts(pubkey_base64);
 
-        ret = 0;
+	ret = 0;
 
 out:
 
 	memset(privkey_base64, 0, sizeof privkey_base64);
 	memset(privkey, 0, sizeof privkey);
+	free(pubkey);
+	free(pubkey_base64);
 
-        return ret;
+	return ret;
 }
 
 #else /* !IPC_SUPPORTS_KERNEL_INTERFACE || NO_IPC_LLCRYPTO */
@@ -177,14 +179,14 @@ int pubkey_main(int argc, char *argv[])
 		}
 		if (outLen != WG_PUBLIC_KEY_LEN) {
 			fprintf(stderr, "wc_ecc_export_x963() returned unexpected key length %u.\n", outLen);
-                        ret = -EINVAL;
+			ret = -EINVAL;
 			goto out;
 		}
 	}
 
 	if (!wg_to_base64(base64, WG_BASE64_LEN(WG_PUBLIC_KEY_LEN), key, WG_PUBLIC_KEY_LEN)) {
 		fprintf(stderr, "%s: wg_to_base64() failed for public key.\n", PROG_NAME);
-                ret = -EINVAL;
+		ret = -EINVAL;
 		goto out;
 	}
 	puts(base64);

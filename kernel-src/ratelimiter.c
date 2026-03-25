@@ -214,10 +214,11 @@ int wg_ratelimiter_init(void)
 	}
 #endif
 
-	queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 	ret = wc_get_random_bytes(key, sizeof(key));
 	if (ret != 0)
 		goto err_kmemcache;
+
+	queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 
 out:
 	mutex_unlock(&init_lock);

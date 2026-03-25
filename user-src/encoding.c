@@ -157,8 +157,6 @@ bool wg_from_base64(uint8_t *out, size_t outLen, const char *in, size_t inLen) {
         uint8_t b1, b2, b3;
         uint8_t e1, e2, e3, e4;
 
-        if (inLen < 4)
-            return false;
         e1 = in[j++];
         e2 = in[j++];
         e3 = in[j++];

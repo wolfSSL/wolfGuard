@@ -164,7 +164,11 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 		net_dbg_ratelimited("%s: Receiving handshake initiation from peer %llu (%pISpfsc)\n",
 				    wg->dev->name, peer->internal_id,
 				    &peer->endpoint.addr);
-		wg_packet_send_handshake_response(peer);
+		{
+			int ret = wg_packet_send_handshake_response(peer);
+			if (ret < 0)
+				return ret;
+		}
 		break;
 	}
 	case cpu_to_le32(MESSAGE_HANDSHAKE_RESPONSE): {

@@ -274,7 +274,9 @@ static void wg_destruct(struct net_device *dev)
 	wg_ratelimiter_uninit();
 	memzero_explicit(&wg->static_identity, sizeof(wg->static_identity));
 	skb_queue_purge(&wg->incoming_handshakes);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
+#endif
 	free_percpu(wg->incoming_handshakes_worker);
 	kvfree(wg->index_hashtable);
 	kvfree(wg->peer_hashtable);
@@ -320,6 +322,9 @@ static void wg_setup(struct net_device *dev)
 	dev->mtu = ETH_DATA_LEN - overhead;
 #ifndef COMPAT_CANNOT_USE_MAX_MTU
 	dev->max_mtu = round_down(INT_MAX, MESSAGE_PADDING_MULTIPLE) - overhead;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
+        dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 #endif
 
 	SET_NETDEV_DEVTYPE(dev, &device_type);
@@ -374,9 +379,11 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	if (!wg->index_hashtable)
 		goto err_free_peer_hashtable;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
 	if (!dev->tstats)
 		goto err_free_index_hashtable;
+#endif
 
 	wg->incoming_handshakes_worker =
 		wg_packet_percpu_multicore_worker_alloc(
@@ -454,8 +461,10 @@ err_destroy_handshake_receive:
 err_free_incoming_handshakes:
 	free_percpu(wg->incoming_handshakes_worker);
 err_free_tstats:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
 err_free_index_hashtable:
+#endif
 	kvfree(wg->index_hashtable);
 err_free_peer_hashtable:
 	kvfree(wg->peer_hashtable);

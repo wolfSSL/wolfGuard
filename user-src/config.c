@@ -251,11 +251,12 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 			return false;
 		}
 		*end++ = '\0';
-		if (*end++ != ':' || !*end) {
+		if (end[0] != ':' || end[1] == 0) {
 			free(mutable);
 			fprintf(stderr, "Unable to find port of endpoint: `%s'\n", value);
 			return false;
 		}
+		++end;
 	} else {
 		begin = mutable;
 		end = strrchr(mutable, ':');
@@ -286,11 +287,13 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 			#ifdef EAI_NODATA
 				ret == EAI_NODATA ||
 			#endif
-				(retries >= 0 && !retries--)) {
+				(retries <= 0)) {
 			free(mutable);
 			fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
 			return false;
 		}
+		if (retries > 0)
+			--retries;
 		fprintf(stderr, "%s: `%s'. Trying again in %.2f seconds...\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value, timeout / 1000000.0);
 		usleep(timeout);
 	}

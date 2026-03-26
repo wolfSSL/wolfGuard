@@ -26,7 +26,7 @@ enum noise_lengths {
 	NOISE_HASH_LEN = WC_SHA256_DIGEST_SIZE
 };
 
-#define noise_encrypted_len(plain_len) ((plain_len) + NOISE_AUTHTAG_LEN)
+#define noise_encrypted_len(plain_len) ((size_t)(plain_len) + (size_t)NOISE_AUTHTAG_LEN)
 
 enum cookie_values {
 	COOKIE_SECRET_MAX_AGE = 2 * 60,

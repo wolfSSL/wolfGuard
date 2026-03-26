@@ -64,6 +64,8 @@ static int prepare_skb_header(struct sk_buff *skb, struct wg_device *wg)
 	size_t data_offset, data_len, header_len;
 	struct udphdr *udp;
 
+	(void)wg;
+
 	if (unlikely(!wg_check_packet_protocol(skb) ||
 		     skb_transport_header(skb) < skb->head ||
 		     (skb_transport_header(skb) + sizeof(struct udphdr)) >

@@ -171,7 +171,7 @@ out:
 	if (!char_is_digit(value[0])) \
 		break; \
 	num = strtoull(value, &end, 10); \
-	if (*end || num > max) \
+	if (*end || num > (max)) \
 		break; \
 	num; \
 })
@@ -349,8 +349,9 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				if (!end)
 					break;
 				*end++ = '\0';
-				if (*end++ != ':' || !*end)
+				if (end[0] != ':' || end[1] == 0)
 					break;
+				++end;
 			} else {
 				begin = value;
 				end = strrchr(value, ':');

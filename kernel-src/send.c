@@ -23,6 +23,7 @@
 static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer)
 {
 	struct message_handshake_initiation packet;
+	int ret;
 
 	if (!wg_birthdate_has_expired(atomic64_read(&peer->last_sent_handshake),
 				      REKEY_TIMEOUT))
@@ -34,19 +35,23 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 			    &peer->endpoint.addr);
 
 	if (wg_noise_handshake_create_initiation(&packet, &peer->handshake)) {
-		int ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
-		if (ret != 0)
-			return ret;
-		wg_timers_any_authenticated_packet_traversal(peer);
-		wg_timers_any_authenticated_packet_sent(peer);
-		atomic64_set(&peer->last_sent_handshake,
-			     ktime_get_coarse_boottime_ns());
-		wg_socket_send_buffer_to_peer(peer, &packet, sizeof(packet),
-					      HANDSHAKE_DSCP);
+		ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
+		if (ret == 0) {
+			wg_timers_any_authenticated_packet_traversal(peer);
+			wg_timers_any_authenticated_packet_sent(peer);
+			atomic64_set(&peer->last_sent_handshake,
+				     ktime_get_coarse_boottime_ns());
+			(void)wg_socket_send_buffer_to_peer(peer, &packet, sizeof(packet),
+							    HANDSHAKE_DSCP);
+		}
 		wg_timers_handshake_initiated(peer);
 	}
+	else
+		ret = -ECANCELED;
 
-	return 0;
+	memzero_explicit(&packet, sizeof packet);
+
+	return ret;
 }
 
 void wg_packet_handshake_send_worker(struct work_struct *work)
@@ -92,6 +97,7 @@ out:
 int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 {
 	struct message_handshake_response packet;
+	int ret;
 
 	atomic64_set(&peer->last_sent_handshake, ktime_get_coarse_boottime_ns());
 	net_dbg_ratelimited("%s: Sending handshake response to peer %llu (%pISpfsc)\n",
@@ -99,24 +105,26 @@ int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 			    &peer->endpoint.addr);
 
 	if (wg_noise_handshake_create_response(&packet, &peer->handshake)) {
-		int ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
-		if (ret != 0)
-			return ret;
-		if (wg_noise_handshake_begin_session(&peer->handshake,
+		ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
+		if ((ret == 0) &&
+		    wg_noise_handshake_begin_session(&peer->handshake,
 						     &peer->keypairs)) {
 			wg_timers_session_derived(peer);
 			wg_timers_any_authenticated_packet_traversal(peer);
 			wg_timers_any_authenticated_packet_sent(peer);
 			atomic64_set(&peer->last_sent_handshake,
 				     ktime_get_coarse_boottime_ns());
-			wg_socket_send_buffer_to_peer(peer, &packet,
+			ret = wg_socket_send_buffer_to_peer(peer, &packet,
 						      sizeof(packet),
 						      HANDSHAKE_DSCP);
-			return 0;
 		}
 	}
+	else
+		ret = -ECANCELED;
 
-	return -ECANCELED;
+	memzero_explicit(&packet, sizeof packet);
+
+	return ret;
 }
 
 int wg_packet_send_handshake_cookie(struct wg_device *wg,
@@ -134,10 +142,8 @@ int wg_packet_send_handshake_cookie(struct wg_device *wg,
         if (ret != 0)
 		return ret;
 
-	wg_socket_send_buffer_as_reply_to_skb(wg, initiating_skb, &packet,
+	return wg_socket_send_buffer_as_reply_to_skb(wg, initiating_skb, &packet,
 					      sizeof(packet));
-
-	return 0;
 }
 
 static void keep_key_fresh(struct wg_peer *peer)

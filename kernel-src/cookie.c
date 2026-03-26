@@ -199,8 +199,10 @@ int __must_check wg_cookie_add_mac_to_packet(void *message, size_t len,
 	down_write(&peer->latest_cookie.lock);
 	ret = compute_mac1(macs->mac1, message, len,
 		     peer->latest_cookie.message_mac1_key);
-	if (ret != 0)
-		goto out;
+	if (ret != 0) {
+		up_write(&peer->latest_cookie.lock);
+		return ret;
+	}
 	memcpy(peer->latest_cookie.last_mac1_sent, macs->mac1, COOKIE_LEN);
 	peer->latest_cookie.have_sent_mac1 = true;
 	up_write(&peer->latest_cookie.lock);
@@ -213,8 +215,6 @@ int __must_check wg_cookie_add_mac_to_packet(void *message, size_t len,
 			     peer->latest_cookie.cookie);
 	else
 		memset(macs->mac2, 0, COOKIE_LEN);
-
-out:
 
 	up_read(&peer->latest_cookie.lock);
 	return ret;

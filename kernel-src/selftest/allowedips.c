@@ -28,6 +28,7 @@ static __init void swap_endian_and_apply_cidr(u8 *dst, const u8 *src, u8 bits,
 		dst[(cidr + 7) / 8 - 1] &= ~0U << ((8 - (cidr % 8)) % 8);
 }
 
+/* NOLINTBEGIN(misc-no-recursion) */
 static __init void print_node(struct allowedips_node *node, u8 bits)
 {
 	char *fmt_connection = KERN_DEBUG "\t\"%p/%d\" -> \"%p/%d\";\n";
@@ -74,6 +75,7 @@ static __init void print_node(struct allowedips_node *node, u8 bits)
 		print_node(rcu_dereference_raw(node->bit[1]), bits);
 	}
 }
+/* NOLINTEND(misc-no-recursion) */
 
 static __init void print_tree(struct allowedips_node __rcu *top, u8 bits)
 {
@@ -176,9 +178,9 @@ horrible_insert_ordered(struct horrible_allowedips *table,
 	u8 my_cidr = horrible_mask_to_cidr(node->mask);
 
 	hlist_for_each_entry(other, &table->head, table) {
-		if (!memcmp(&other->mask, &node->mask,
+		if (!memcmp((void *)&other->mask, (void *)&node->mask,
 			    sizeof(union nf_inet_addr)) &&
-		    !memcmp(&other->ip, &node->ip,
+		    !memcmp((void *)&other->ip, (void *)&node->ip,
 			    sizeof(union nf_inet_addr)) &&
 		    other->ip_version == node->ip_version) {
 			other->value = node->value;

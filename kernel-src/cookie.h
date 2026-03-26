@@ -52,7 +52,7 @@ enum cookie_mac_state __must_check wg_cookie_validate_packet(struct cookie_check
 int __must_check wg_cookie_add_mac_to_packet(void *message, size_t len,
 				 struct wg_peer *peer);
 
-int __must_check wg_cookie_message_create(struct message_handshake_cookie *src,
+int __must_check wg_cookie_message_create(struct message_handshake_cookie *dst,
 			      struct sk_buff *skb, __le32 index,
 			      struct cookie_checker *checker);
 int __must_check wg_cookie_message_consume(struct message_handshake_cookie *src,

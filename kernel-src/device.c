@@ -91,6 +91,9 @@ static int wg_pm_notification(struct notifier_block *nb, unsigned long action,
 	struct wg_device *wg;
 	struct wg_peer *peer;
 
+	(void)nb;
+	(void)data;
+
 	/* If the machine is constantly suspending and resuming, as part of
 	 * its normal operation rather than as a somewhat rare event, then we
 	 * don't actually want to clear keys.
@@ -324,7 +327,7 @@ static void wg_setup(struct net_device *dev)
 	dev->max_mtu = round_down(INT_MAX, MESSAGE_PADDING_MULTIPLE) - overhead;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
-        dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 #endif
 
 	SET_NETDEV_DEVTYPE(dev, &device_type);
@@ -338,8 +341,8 @@ static void wg_setup(struct net_device *dev)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 static int wg_newlink(struct net_device *dev,
-                      struct rtnl_newlink_params *params,
-                      struct netlink_ext_ack *extack)
+		      struct rtnl_newlink_params *params,
+		      struct netlink_ext_ack *extack)
 #else
 static int wg_newlink(struct net *src_net, struct net_device *dev,
 		      struct nlattr *tb[], struct nlattr *data[],
@@ -351,6 +354,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 #endif
 	struct wg_device *wg = netdev_priv(dev);
 	int ret;
+
+	(void)extack;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 	rcu_assign_pointer(wg->creating_net, link_net);
@@ -393,8 +398,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
 	/* see 27ce71e1ce.  actually defined by 6.17.8, but don't bother with
-         * that.
-         */
+	 * that.
+	 */
 	#define WQ_PERCPU 0
 #endif
 
@@ -428,8 +433,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 		goto err_free_decrypt_queue;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
-        /* see db9ae3b6b4 and 78afdadafe. */
-        netif_threaded_enable(dev);
+	/* see db9ae3b6b4 and 78afdadafe. */
+	netif_threaded_enable(dev);
 #endif
 
 	ret = register_netdevice(dev);

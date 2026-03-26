@@ -12,7 +12,7 @@
 struct wgdevice;
 
 int ipc_set_device(struct wgdevice *dev);
-int ipc_get_device(struct wgdevice **dev, const char *interface);
+int ipc_get_device(struct wgdevice **dev, const char *iface);
 char *ipc_list_devices(void);
 
 #ifndef NO_IPC_LLCRYPTO

@@ -826,7 +826,6 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 	u8 chaining_key[NOISE_HASH_LEN];
 	u8 e[NOISE_PUBLIC_KEY_LEN];
 	u8 ephemeral_private[NOISE_PRIVATE_KEY_LEN];
-	u8 static_private[NOISE_PRIVATE_KEY_LEN];
 	u8 preshared_key[NOISE_SYMMETRIC_KEY_LEN];
 
 	down_read(&wg->static_identity.lock);
@@ -855,7 +854,7 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 
 	/* e */
 	if (message_ephemeral(e, src->unencrypted_ephemeral, chaining_key, hash) != 0)
-		goto out;
+		goto fail;
 
 	/* ee */
 	if (!mix_dh(chaining_key, NULL, ephemeral_private, e))
@@ -867,7 +866,7 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 
 	/* psk */
 	if (mix_psk(chaining_key, hash, key, preshared_key) != 0)
-		goto out;
+		goto fail;
 
 	/* {} */
 	if (!message_decrypt(NULL, 0, src->encrypted_nothing,
@@ -899,7 +898,6 @@ out:
 	memzero_explicit(hash, NOISE_HASH_LEN);
 	memzero_explicit(chaining_key, NOISE_HASH_LEN);
 	memzero_explicit(ephemeral_private, NOISE_PRIVATE_KEY_LEN);
-	memzero_explicit(static_private, NOISE_PRIVATE_KEY_LEN);
 	memzero_explicit(preshared_key, NOISE_SYMMETRIC_KEY_LEN);
 	up_read(&wg->static_identity.lock);
 	WC_DEBUG_PR_NULL_RET(ret_peer);

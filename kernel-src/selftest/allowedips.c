@@ -368,6 +368,7 @@ static __init bool randomized_test(void)
 				mutate_mask[k] = 0xff;
 			mutate_mask[k] = 0xff
 					 << ((8 - (mutate_amount % 8)) % 8);
+			/* 16 bytes of IPv6 address */
 			for (; k < 16; ++k)
 				mutate_mask[k] = 0;
 			for (k = 0; k < 16; ++k)

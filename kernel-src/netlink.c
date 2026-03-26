@@ -559,18 +559,18 @@ static int wg_set_device(struct sk_buff *skb, struct genl_info *info)
 		u8 public_key[NOISE_PUBLIC_KEY_LEN];
 		struct wg_peer *peer, *temp;
 
-                if (!ConstantCompare(wg->static_identity.static_private,
-                                     private_key, NOISE_PRIVATE_KEY_LEN))
+		if (!ConstantCompare(wg->static_identity.static_private,
+				     private_key, NOISE_PRIVATE_KEY_LEN))
 			goto skip_set_private_key;
 
 		/* We remove before setting, to prevent race, which means doing
 		 * two genpub ops.
 		 */
-                if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
-                                                  public_key, sizeof(public_key),
-                                                  NOISE_CURVE_ID,
-                                                  WG_PUBLIC_KEY_COMPRESSED) == 0)
-                {
+		if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
+						  public_key, sizeof(public_key),
+						  NOISE_CURVE_ID,
+						  WG_PUBLIC_KEY_COMPRESSED) == 0)
+		{
 			peer = wg_pubkey_hashtable_lookup(wg->peer_hashtable,
 							  public_key);
 			if (peer) {

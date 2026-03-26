@@ -132,14 +132,14 @@ int wg_packet_send_handshake_cookie(struct wg_device *wg,
 				     __le32 sender_index)
 {
 	struct message_handshake_cookie packet;
-        int ret;
+	int ret;
 
 	net_dbg_skb_ratelimited("%s: Sending cookie response for denied handshake message for %pISpfsc\n",
 				wg->dev->name, initiating_skb);
 
 	ret = wg_cookie_message_create(&packet, initiating_skb, sender_index,
 				 &wg->cookie_checker);
-        if (ret != 0)
+	if (ret != 0)
 		return ret;
 
 	return wg_socket_send_buffer_as_reply_to_skb(wg, initiating_skb, &packet,
@@ -239,8 +239,8 @@ static bool encrypt_packet(struct sk_buff *skb, struct noise_keypair *keypair)
 			 noise_encrypted_len(plaintext_len)) <= 0)
 		return false;
 	return wc_AesGcm_encrypt_sg_inplace(sg, plaintext_len, NULL, 0,
-                                            PACKET_CB(skb)->nonce,
-                                            keypair->sending.key, sizeof(keypair->sending.key));
+					    PACKET_CB(skb)->nonce,
+					    keypair->sending.key, sizeof(keypair->sending.key));
 }
 
 void wg_packet_send_keepalive(struct wg_peer *peer)

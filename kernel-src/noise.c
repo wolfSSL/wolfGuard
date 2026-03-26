@@ -60,7 +60,7 @@ __must_check int __init wg_noise_init(void)
 		return -EINVAL;
 	}
 
-        return 0;
+	return 0;
 }
 
 /* Must hold peer->handshake.static_identity->lock */
@@ -75,7 +75,7 @@ void wg_noise_precompute_static_static(struct wg_peer *peer)
 				       sizeof(peer->handshake.static_identity->static_private),
 				       peer->handshake.remote_static,
 				       sizeof(peer->handshake.remote_static),
-                                       NOISE_CURVE_ID) != 0))
+				       NOISE_CURVE_ID) != 0))
 	{
 		memzero_explicit(peer->handshake.precomputed_static_static,
 		       NOISE_PRIVATE_KEY_LEN);
@@ -409,7 +409,7 @@ static int __must_check kdf(u8 *first_dst, u8 *second_dst, u8 *third_dst, const 
 	ret = wc_hmac_oneshot_prealloc(wc_hmac, WC_SHA256, output, sizeof(output), output,
 				       WC_SHA256_DIGEST_SIZE + 1, secret, WC_SHA256_DIGEST_SIZE);
 
-        if (ret != 0)
+	if (ret != 0)
 		goto out;
 
 	memcpy(third_dst, output, third_len);
@@ -451,7 +451,7 @@ static bool __must_check mix_dh(u8 chaining_key[NOISE_HASH_LEN],
 	if (wc_ecc_shared_secret_exim(dh_calculation, sizeof(dh_calculation),
 				      private, NOISE_PRIVATE_KEY_LEN,
 				      public, NOISE_PUBLIC_KEY_LEN,
-                                      NOISE_CURVE_ID) != 0)
+				      NOISE_CURVE_ID) != 0)
 		WC_DEBUG_PR_FALSE_RET(false);
 	if (kdf(chaining_key, key, NULL, dh_calculation, NOISE_HASH_LEN,
 		NOISE_SYMMETRIC_KEY_LEN, 0, NOISE_PRIVATE_KEY_LEN, chaining_key) == 0)
@@ -604,7 +604,7 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 	dst->header.type = cpu_to_le32(MESSAGE_HANDSHAKE_INITIATION);
 
 	if (handshake_init(handshake->chaining_key, handshake->hash,
-                           handshake->remote_static) != 0)
+			   handshake->remote_static) != 0)
 		goto out;
 
 	/* e */
@@ -614,8 +614,8 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 		goto out;
 
 	if (message_ephemeral(dst->unencrypted_ephemeral,
-                              dst->unencrypted_ephemeral, handshake->chaining_key,
-                              handshake->hash) != 0)
+			      dst->unencrypted_ephemeral, handshake->chaining_key,
+			      handshake->hash) != 0)
 		goto out;
 
 	/* es */
@@ -625,8 +625,8 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 
 	/* s */
 	if (message_encrypt(dst->encrypted_static, sizeof(dst->encrypted_static),
-                            handshake->static_identity->static_public,
-                            NOISE_PUBLIC_KEY_LEN, key, handshake->hash) != 0)
+			    handshake->static_identity->static_public,
+			    NOISE_PUBLIC_KEY_LEN, key, handshake->hash) != 0)
 		goto out;
 
 	/* ss */
@@ -925,12 +925,12 @@ bool wg_noise_handshake_begin_session(struct noise_handshake *handshake,
 		if (derive_keys(&new_keypair->sending, &new_keypair->receiving,
 				handshake->chaining_key) != 0)
 			goto out;
-        }
+	}
 	else {
 		if (derive_keys(&new_keypair->receiving, &new_keypair->sending,
 				handshake->chaining_key) != 0)
 			goto out;
-        }
+	}
 
 	handshake_zero(handshake);
 	rcu_read_lock_bh();

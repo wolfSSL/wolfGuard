@@ -315,7 +315,7 @@ static void wg_setup(struct net_device *dev)
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)) || \
     (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 6))))
-        dev->lltx = true;
+	dev->lltx = true;
 #else
 	dev->features |= NETIF_F_LLTX;
 #endif

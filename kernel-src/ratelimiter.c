@@ -185,13 +185,13 @@ int wg_ratelimiter_init(void)
 	 * dependent on RAM. This calculation here comes from there.
 	 */
 #if defined(RHEL_MAJOR) && (RHEL_MAJOR == 8)
-        {
-            const unsigned long _roundup = roundup_pow_of_two(
+	{
+	    const unsigned long _roundup = roundup_pow_of_two(
 			(totalram_pages() << PAGE_SHIFT) /
 			(1U << 14) / sizeof(struct hlist_head));
-            table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
-                (_roundup > 16 ? _roundup : 16);
-        }
+	    table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
+		(_roundup > 16 ? _roundup : 16);
+	}
 #else
 	table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
 		max_t(unsigned long, 16, roundup_pow_of_two(
@@ -248,7 +248,7 @@ void wg_ratelimiter_uninit(void)
 	mutex_lock(&init_lock);
 	if (init_refcnt == 0)
 		goto out;
-        --init_refcnt;
+	--init_refcnt;
 	if (init_refcnt > 0)
 		goto out;
 

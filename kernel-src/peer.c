@@ -53,7 +53,7 @@ struct wg_peer *wg_peer_create(struct wg_device *wg,
 	wg_timers_init(peer);
 
 	ret = wg_cookie_checker_precompute_peer_keys(peer);
-        if (ret)
+	if (ret)
 		goto err_4;
 
 	spin_lock_init(&peer->keypairs.keypair_update_lock);
@@ -82,7 +82,7 @@ struct wg_peer *wg_peer_create(struct wg_device *wg,
 	return peer;
 
 err_4:
-        wg_packet_queue_free(&peer->rx_queue, false);
+	wg_packet_queue_free(&peer->rx_queue, false);
 err_3:
 	wg_packet_queue_free(&peer->tx_queue, false);
 err_2:

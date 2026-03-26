@@ -460,7 +460,11 @@ static void coalesce_peers(struct wgdevice *device)
 			peer = peer->next_peer;
 			continue;
 		}
-		if (!peer->first_allowedip) {
+
+		if (!peer->next_peer->first_allowedip) {
+			/* just remove the empty duplicate, don't touch allowedip pointers. */
+		}
+		else if (!peer->first_allowedip) {
 			peer->first_allowedip = peer->next_peer->first_allowedip;
 			peer->last_allowedip = peer->next_peer->last_allowedip;
 		} else {

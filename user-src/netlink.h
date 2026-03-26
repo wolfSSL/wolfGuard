@@ -53,10 +53,10 @@ enum mnl_attr_data_type {
 
 #define mnl_attr_for_each_payload(payload, payload_size) \
 	for ((attr) = (payload); \
-	     mnl_attr_ok((attr), (char *)(payload) + payload_size - (char *)(attr)); \
+	     mnl_attr_ok((attr), (char *)(payload) + (payload_size) - (char *)(attr)); \
 	     (attr) = mnl_attr_next(attr))
 
-#define MNL_CB_ERROR	-1
+#define MNL_CB_ERROR	(-1)
 #define MNL_CB_STOP	0
 #define MNL_CB_OK	1
 

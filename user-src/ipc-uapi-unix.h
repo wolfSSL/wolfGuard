@@ -30,8 +30,10 @@ static FILE *userspace_interface_file(const char *iface)
 	if (strchr(iface, '/'))
 		goto out;
 	ret = snprintf(addr.sun_path, sizeof(addr.sun_path), SOCK_PATH "%s" SOCK_SUFFIX, iface);
-	if (ret < 0)
+	if ((ret < 0) || (ret >= (int)sizeof(addr.sun_path))) {
+		errno = ENAMETOOLONG;
 		goto out;
+	}
 	ret = stat(addr.sun_path, &sbuf);
 	if (ret < 0)
 		goto out;
@@ -71,7 +73,8 @@ static bool userspace_has_wolfguard_interface(const char *iface)
 
 	if (strchr(iface, '/'))
 		return false;
-	if (snprintf(addr.sun_path, sizeof(addr.sun_path), SOCK_PATH "%s" SOCK_SUFFIX, iface) < 0)
+	ret = snprintf(addr.sun_path, sizeof(addr.sun_path), SOCK_PATH "%s" SOCK_SUFFIX, iface);
+	if ((ret < 0) || (ret >= (int)sizeof(addr.sun_path)))
 		return false;
 	if (stat(addr.sun_path, &sbuf) < 0)
 		return false;

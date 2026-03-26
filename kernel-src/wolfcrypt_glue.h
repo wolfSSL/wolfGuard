@@ -37,20 +37,14 @@
 /* internal file misc.c at commit d9f7629296 has inline CopyString() that calls
  * XMALLOC().
  */
+
 #include <linux/mm.h>
-#include <wolfssl/wolfcrypt/wc_port.h>
-#include <wolfssl/wolfcrypt/error-crypt.h>
-
-#if 0
-#define WOLFSSL_MISC_INCLUDED
-#undef min
-#undef max
-#include <wolfcrypt/src/misc.c>
-#endif
-
 #include <linux/kconfig.h>
 #include <linux/kernel.h>
 #include <linux/scatterlist.h>
+
+#include <wolfssl/wolfcrypt/wc_port.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
 
 #define PRNT_NZ(...)                                                    \
     ({                                                                  \

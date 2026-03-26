@@ -559,18 +559,18 @@ static int wg_set_device(struct sk_buff *skb, struct genl_info *info)
 		u8 public_key[NOISE_PUBLIC_KEY_LEN];
 		struct wg_peer *peer, *temp;
 
-                if (!ConstantCompare(wg->static_identity.static_private,
-                                     private_key, NOISE_PRIVATE_KEY_LEN))
+		if (!ConstantCompare(wg->static_identity.static_private,
+				     private_key, NOISE_PRIVATE_KEY_LEN))
 			goto skip_set_private_key;
 
 		/* We remove before setting, to prevent race, which means doing
 		 * two genpub ops.
 		 */
-                if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
-                                                  public_key, sizeof(public_key),
-                                                  NOISE_CURVE_ID,
-                                                  WG_PUBLIC_KEY_COMPRESSED) == 0)
-                {
+		if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
+						  public_key, sizeof(public_key),
+						  NOISE_CURVE_ID,
+						  WG_PUBLIC_KEY_COMPRESSED) == 0)
+		{
 			peer = wg_pubkey_hashtable_lookup(wg->peer_hashtable,
 							  public_key);
 			if (peer) {
@@ -625,7 +625,7 @@ static int wg_nl_generate_privkey(struct sk_buff *skb, struct genl_info *info)
 {
 	int ret = -ENOMEM;
 	u8 *private = NULL, *public = NULL;
-	struct sk_buff *reply;
+	struct sk_buff *reply = NULL;
 	void *hdr = NULL;
 
 	if ((! skb) || (! info) || (! info->genlhdr))
@@ -866,15 +866,18 @@ struct genl_ops genl_ops[] = {
 	}, {
 		.cmd = WG_CMD_GEN_PRIVKEY,
 		.doit = wg_nl_generate_privkey,
-		.policy = device_policy
+		.policy = device_policy,
+		.flags = GENL_UNS_ADMIN_PERM
 	}, {
 		.cmd = WG_CMD_DERIVE_PUBKEY,
 		.doit = wg_nl_derive_pubkey,
-		.policy = device_policy
+		.policy = device_policy,
+		.flags = GENL_UNS_ADMIN_PERM
 	}, {
 		.cmd = WG_CMD_GEN_PSK,
 		.doit = wg_nl_generate_psk,
-		.policy = device_policy
+		.policy = device_policy,
+		.flags = GENL_UNS_ADMIN_PERM
 	}
 };
 

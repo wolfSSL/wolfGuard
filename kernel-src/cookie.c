@@ -42,7 +42,7 @@ static int precompute_key(u8 key[NOISE_SYMMETRIC_KEY_LEN],
 }
 
 /* Must hold peer->handshake.static_identity->lock */
-int wg_cookie_checker_precompute_device_keys(struct cookie_checker *checker)
+int __must_check wg_cookie_checker_precompute_device_keys(struct cookie_checker *checker)
 {
 	int ret;
 	if (likely(checker->device->static_identity.has_identity)) {
@@ -54,7 +54,7 @@ int wg_cookie_checker_precompute_device_keys(struct cookie_checker *checker)
 		ret = precompute_key(checker->message_mac1_key,
 			       checker->device->static_identity.static_public,
 			       mac1_key_label);
-                return ret;
+		return ret;
 	} else {
 		memset(checker->cookie_encryption_key, 0,
 		       NOISE_SYMMETRIC_KEY_LEN);
@@ -64,7 +64,7 @@ int wg_cookie_checker_precompute_device_keys(struct cookie_checker *checker)
 	__builtin_unreachable();
 }
 
-int wg_cookie_checker_precompute_peer_keys(struct wg_peer *peer)
+int __must_check wg_cookie_checker_precompute_peer_keys(struct wg_peer *peer)
 {
 	int ret;
 	ret = precompute_key(peer->latest_cookie.cookie_decryption_key,
@@ -82,7 +82,7 @@ void wg_cookie_init(struct cookie *cookie)
 	init_rwsem(&cookie->lock);
 }
 
-static int compute_mac1(u8 mac1[COOKIE_LEN], const void *message, size_t len,
+static int __must_check compute_mac1(u8 mac1[COOKIE_LEN], const void *message, size_t len,
 			 const u8 key[NOISE_SYMMETRIC_KEY_LEN])
 {
 	len = len - sizeof(struct message_macs) +
@@ -91,16 +91,16 @@ static int compute_mac1(u8 mac1[COOKIE_LEN], const void *message, size_t len,
 			       NOISE_SYMMETRIC_KEY_LEN);
 }
 
-static int compute_mac2(u8 mac2[COOKIE_LEN], const void *message, size_t len,
+static int __must_check compute_mac2(u8 mac2[COOKIE_LEN], const void *message, size_t len,
 			 const u8 cookie[COOKIE_LEN])
 {
 	len = len - sizeof(struct message_macs) +
 	      offsetof(struct message_macs, mac2);
 	return wc_hmac_oneshot(WC_SHA256, mac2, COOKIE_LEN, message, len, cookie,
-                               COOKIE_LEN);
+			       COOKIE_LEN);
 }
 
-static int make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
+static int __must_check make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 			struct cookie_checker *checker)
 {
 	int ret;
@@ -148,7 +148,7 @@ static int make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 	return ret;
 }
 
-enum cookie_mac_state wg_cookie_validate_packet(struct cookie_checker *checker,
+enum cookie_mac_state __must_check wg_cookie_validate_packet(struct cookie_checker *checker,
 						struct sk_buff *skb,
 						bool check_cookie)
 {
@@ -159,8 +159,9 @@ enum cookie_mac_state wg_cookie_validate_packet(struct cookie_checker *checker,
 	u8 cookie[COOKIE_LEN];
 
 	ret = INVALID_MAC;
-	compute_mac1(computed_mac, skb->data, skb->len,
-		     checker->message_mac1_key);
+	if (compute_mac1(computed_mac, skb->data, skb->len,
+			 checker->message_mac1_key) != 0)
+		goto out;
 	if (ConstantCompare(computed_mac, macs->mac1, COOKIE_LEN))
 		goto out;
 
@@ -172,7 +173,9 @@ enum cookie_mac_state wg_cookie_validate_packet(struct cookie_checker *checker,
 	if (make_cookie(cookie, skb, checker) != 0)
 		goto out;
 
-	compute_mac2(computed_mac, skb->data, skb->len, cookie);
+	if (compute_mac2(computed_mac, skb->data, skb->len, cookie) != 0)
+		goto out;
+
 	if (ConstantCompare(computed_mac, macs->mac2, COOKIE_LEN))
 		goto out;
 
@@ -186,15 +189,20 @@ out:
 	return ret;
 }
 
-void wg_cookie_add_mac_to_packet(void *message, size_t len,
+int __must_check wg_cookie_add_mac_to_packet(void *message, size_t len,
 				 struct wg_peer *peer)
 {
+	int ret;
 	struct message_macs *macs = (struct message_macs *)
 		((u8 *)message + len - sizeof(*macs));
 
 	down_write(&peer->latest_cookie.lock);
-	compute_mac1(macs->mac1, message, len,
+	ret = compute_mac1(macs->mac1, message, len,
 		     peer->latest_cookie.message_mac1_key);
+	if (ret != 0) {
+		up_write(&peer->latest_cookie.lock);
+		return ret;
+	}
 	memcpy(peer->latest_cookie.last_mac1_sent, macs->mac1, COOKIE_LEN);
 	peer->latest_cookie.have_sent_mac1 = true;
 	up_write(&peer->latest_cookie.lock);
@@ -203,14 +211,16 @@ void wg_cookie_add_mac_to_packet(void *message, size_t len,
 	if (peer->latest_cookie.is_valid &&
 	    !wg_birthdate_has_expired(peer->latest_cookie.birthdate,
 				COOKIE_SECRET_MAX_AGE - COOKIE_SECRET_LATENCY))
-		compute_mac2(macs->mac2, message, len,
+		ret = compute_mac2(macs->mac2, message, len,
 			     peer->latest_cookie.cookie);
 	else
 		memset(macs->mac2, 0, COOKIE_LEN);
+
 	up_read(&peer->latest_cookie.lock);
+	return ret;
 }
 
-int wg_cookie_message_create(struct message_handshake_cookie *dst,
+int __must_check wg_cookie_message_create(struct message_handshake_cookie *dst,
 			      struct sk_buff *skb, __le32 index,
 			      struct cookie_checker *checker)
 {
@@ -234,7 +244,7 @@ int wg_cookie_message_create(struct message_handshake_cookie *dst,
 	return ret;
 }
 
-int wg_cookie_message_consume(struct message_handshake_cookie *src,
+int __must_check wg_cookie_message_consume(struct message_handshake_cookie *src,
 			       struct wg_device *wg)
 {
 	struct wg_peer *peer = NULL;

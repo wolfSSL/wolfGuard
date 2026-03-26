@@ -31,7 +31,7 @@ static void copy_and_assign_cidr(struct allowedips_node *node, const u8 *src,
 	memcpy(node->bits, src, bits / 8U);
 }
 #define CHOOSE_NODE(parent, key) \
-	parent->bit[(key[parent->bit_at_a] >> parent->bit_at_b) & 1]
+	(parent)->bit[((key)[(parent)->bit_at_a] >> (parent)->bit_at_b) & 1]
 
 static void node_free_rcu(struct rcu_head *rcu)
 {
@@ -53,7 +53,10 @@ static void root_free_rcu(struct rcu_head *rcu)
 		container_of(rcu, struct allowedips_node, rcu) };
 	unsigned int len = 1;
 
-	while (len > 0 && (node = stack[--len])) {
+	while (len > 0) {
+		node = stack[--len];
+		if (!node)
+			break;
 		push_rcu(stack, node->bit[0], &len);
 		push_rcu(stack, node->bit[1], &len);
 		kfree(node);
@@ -65,7 +68,10 @@ static void root_remove_peer_lists(struct allowedips_node *root)
 	struct allowedips_node *node, *stack[128] = { root };
 	unsigned int len = 1;
 
-	while (len > 0 && (node = stack[--len])) {
+	while (len > 0) {
+		node = stack[--len];
+		if (!node)
+			break;
 		push_rcu(stack, node->bit[0], &len);
 		push_rcu(stack, node->bit[1], &len);
 		if (rcu_access_pointer(node->peer))

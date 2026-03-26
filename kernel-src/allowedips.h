@@ -38,7 +38,7 @@ struct allowedips {
 };
 
 void wg_allowedips_init(struct allowedips *table);
-void wg_allowedips_free(struct allowedips *table, struct mutex *mutex);
+void wg_allowedips_free(struct allowedips *table, struct mutex *lock);
 int wg_allowedips_insert_v4(struct allowedips *table, const struct in_addr *ip,
 			    u8 cidr, struct wg_peer *peer, struct mutex *lock);
 int wg_allowedips_insert_v6(struct allowedips *table, const struct in6_addr *ip,

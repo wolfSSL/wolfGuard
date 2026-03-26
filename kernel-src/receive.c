@@ -27,8 +27,8 @@ static void update_rx_stats(struct wg_peer *peer, size_t len)
 	u64_stats_update_begin(&tstats->syncp);
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)) || \
     (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 5))))
-        u64_stats_inc(&tstats->rx_packets);
-        u64_stats_add(&tstats->rx_bytes, len);
+	u64_stats_inc(&tstats->rx_packets);
+	u64_stats_add(&tstats->rx_bytes, len);
 #else
 	++tstats->rx_packets;
 	tstats->rx_bytes += len;
@@ -63,6 +63,8 @@ static int prepare_skb_header(struct sk_buff *skb, struct wg_device *wg)
 {
 	size_t data_offset, data_len, header_len;
 	struct udphdr *udp;
+
+	(void)wg;
 
 	if (unlikely(!wg_check_packet_protocol(skb) ||
 		     skb_transport_header(skb) < skb->head ||
@@ -164,7 +166,11 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 		net_dbg_ratelimited("%s: Receiving handshake initiation from peer %llu (%pISpfsc)\n",
 				    wg->dev->name, peer->internal_id,
 				    &peer->endpoint.addr);
-		wg_packet_send_handshake_response(peer);
+		{
+			int ret = wg_packet_send_handshake_response(peer);
+			if (ret < 0)
+				return ret;
+		}
 		break;
 	}
 	case cpu_to_le32(MESSAGE_HANDSHAKE_RESPONSE): {

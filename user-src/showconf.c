@@ -47,7 +47,7 @@ int showconf_main(int argc, char *argv[])
 	if (device->flags & WGDEVICE_HAS_PRIVATE_KEY) {
 		if (!wg_to_base64(base64, WG_BASE64_LEN(WG_PRIVATE_KEY_LEN), device->private_key, sizeof(device->private_key))) {
 			fprintf(stderr, "wg_to_base64() failed.\n");
-			return 1;
+			goto cleanup;
 		}
 		printf("PrivateKey = %s\n", base64);
 	}
@@ -55,13 +55,13 @@ int showconf_main(int argc, char *argv[])
 	for_each_wgpeer(device, peer) {
 		if (!wg_to_base64(base64, WG_BASE64_LEN(WG_PUBLIC_KEY_LEN), peer->public_key, sizeof(peer->public_key))) {
 			fprintf(stderr, "wg_to_base64() failed.\n");
-			return 1;
+			goto cleanup;
 		}
 		printf("[Peer]\nPublicKey = %s\n", base64);
 		if (peer->flags & WGPEER_HAS_PRESHARED_KEY) {
 			if (!wg_to_base64(base64, WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN), peer->preshared_key, sizeof(peer->preshared_key))) {
 				fprintf(stderr, "wg_to_base64() failed.\n");
-				return 1;
+				goto cleanup;
 			}
 			printf("PresharedKey = %s\n", base64);
 		}

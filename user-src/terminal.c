@@ -32,7 +32,7 @@ static bool color_mode(void)
 static void filter_ansi(const char *fmt, va_list args)
 {
 	char *str = NULL;
-	size_t len, i, j;
+	int len, i, j;
 
 	if (color_mode()) {
 		vfprintf(stdout, fmt, args);

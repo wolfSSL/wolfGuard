@@ -91,6 +91,9 @@ static int wg_pm_notification(struct notifier_block *nb, unsigned long action,
 	struct wg_device *wg;
 	struct wg_peer *peer;
 
+	(void)nb;
+	(void)data;
+
 	/* If the machine is constantly suspending and resuming, as part of
 	 * its normal operation rather than as a somewhat rare event, then we
 	 * don't actually want to clear keys.
@@ -274,7 +277,9 @@ static void wg_destruct(struct net_device *dev)
 	wg_ratelimiter_uninit();
 	memzero_explicit(&wg->static_identity, sizeof(wg->static_identity));
 	skb_queue_purge(&wg->incoming_handshakes);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
+#endif
 	free_percpu(wg->incoming_handshakes_worker);
 	kvfree(wg->index_hashtable);
 	kvfree(wg->peer_hashtable);
@@ -310,7 +315,7 @@ static void wg_setup(struct net_device *dev)
 #endif
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)) || \
     (defined(RHEL_MAJOR) && ((RHEL_MAJOR > 9) || ((RHEL_MAJOR == 9) && (RHEL_MINOR >= 6))))
-        dev->lltx = true;
+	dev->lltx = true;
 #else
 	dev->features |= NETIF_F_LLTX;
 #endif
@@ -320,6 +325,9 @@ static void wg_setup(struct net_device *dev)
 	dev->mtu = ETH_DATA_LEN - overhead;
 #ifndef COMPAT_CANNOT_USE_MAX_MTU
 	dev->max_mtu = round_down(INT_MAX, MESSAGE_PADDING_MULTIPLE) - overhead;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 9, 0)
+	dev->pcpu_stat_type = NETDEV_PCPU_STAT_TSTATS;
 #endif
 
 	SET_NETDEV_DEVTYPE(dev, &device_type);
@@ -333,8 +341,8 @@ static void wg_setup(struct net_device *dev)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 static int wg_newlink(struct net_device *dev,
-                      struct rtnl_newlink_params *params,
-                      struct netlink_ext_ack *extack)
+		      struct rtnl_newlink_params *params,
+		      struct netlink_ext_ack *extack)
 #else
 static int wg_newlink(struct net *src_net, struct net_device *dev,
 		      struct nlattr *tb[], struct nlattr *data[],
@@ -346,6 +354,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 #endif
 	struct wg_device *wg = netdev_priv(dev);
 	int ret;
+
+	(void)extack;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 	rcu_assign_pointer(wg->creating_net, link_net);
@@ -374,9 +384,11 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	if (!wg->index_hashtable)
 		goto err_free_peer_hashtable;
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	dev->tstats = netdev_alloc_pcpu_stats(struct pcpu_sw_netstats);
 	if (!dev->tstats)
 		goto err_free_index_hashtable;
+#endif
 
 	wg->incoming_handshakes_worker =
 		wg_packet_percpu_multicore_worker_alloc(
@@ -386,8 +398,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
 	/* see 27ce71e1ce.  actually defined by 6.17.8, but don't bother with
-         * that.
-         */
+	 * that.
+	 */
 	#define WQ_PERCPU 0
 #endif
 
@@ -421,8 +433,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 		goto err_free_decrypt_queue;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
-        /* see db9ae3b6b4 and 78afdadafe. */
-        netif_threaded_enable(dev);
+	/* see db9ae3b6b4 and 78afdadafe. */
+	netif_threaded_enable(dev);
 #endif
 
 	ret = register_netdevice(dev);
@@ -454,8 +466,10 @@ err_destroy_handshake_receive:
 err_free_incoming_handshakes:
 	free_percpu(wg->incoming_handshakes_worker);
 err_free_tstats:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
 err_free_index_hashtable:
+#endif
 	kvfree(wg->index_hashtable);
 err_free_peer_hashtable:
 	kvfree(wg->peer_hashtable);

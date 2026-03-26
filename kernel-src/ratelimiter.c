@@ -31,7 +31,7 @@ static DEFINE_MUTEX(init_lock);
 static u64 init_refcnt; /* Protected by init_lock, hence not atomic. */
 static atomic_t total_entries = ATOMIC_INIT(0);
 static unsigned int max_entries, table_size;
-static void wg_ratelimiter_gc_entries(struct work_struct *);
+static void wg_ratelimiter_gc_entries(struct work_struct *work);
 static DECLARE_DEFERRABLE_WORK(gc_work, wg_ratelimiter_gc_entries);
 static struct hlist_head *table_v4;
 #if IS_ENABLED(CONFIG_IPV6)
@@ -185,13 +185,13 @@ int wg_ratelimiter_init(void)
 	 * dependent on RAM. This calculation here comes from there.
 	 */
 #if defined(RHEL_MAJOR) && (RHEL_MAJOR == 8)
-        {
-            const unsigned long _roundup = roundup_pow_of_two(
+	{
+	    const unsigned long _roundup = roundup_pow_of_two(
 			(totalram_pages() << PAGE_SHIFT) /
 			(1U << 14) / sizeof(struct hlist_head));
-            table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
-                (_roundup > 16 ? _roundup : 16);
-        }
+	    table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
+		(_roundup > 16 ? _roundup : 16);
+	}
 #else
 	table_size = (totalram_pages() > (1U << 30) / PAGE_SIZE) ? 8192 :
 		max_t(unsigned long, 16, roundup_pow_of_two(
@@ -214,10 +214,11 @@ int wg_ratelimiter_init(void)
 	}
 #endif
 
-	queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 	ret = wc_get_random_bytes(key, sizeof(key));
 	if (ret != 0)
 		goto err_kmemcache;
+
+	queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 
 out:
 	mutex_unlock(&init_lock);
@@ -245,7 +246,10 @@ err:
 void wg_ratelimiter_uninit(void)
 {
 	mutex_lock(&init_lock);
-	if (!init_refcnt || --init_refcnt)
+	if (init_refcnt == 0)
+		goto out;
+	--init_refcnt;
+	if (init_refcnt > 0)
 		goto out;
 
 	cancel_delayed_work_sync(&gc_work);

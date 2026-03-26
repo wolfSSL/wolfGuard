@@ -182,6 +182,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
 {
     int ret = -1;
     struct sg_mapping_iter miter;
+    int miter_needs_stop = 0;
     unsigned int flags;
     int sl;
     Aes *aes = NULL;
@@ -245,6 +246,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
         flags |= SG_MITER_ATOMIC;
 
     sg_miter_start(&miter, src, sg_nents(src), flags);
+    miter_needs_stop = 1;
 
     for (sl = src_len; sl > 0 && sg_miter_next(&miter); sl -= miter.length) {
         size_t length = min_t(size_t, sl, miter.length);
@@ -278,6 +280,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
     }
 
     sg_miter_stop(&miter);
+    miter_needs_stop = 0;
 
     if (sl > -WC_AES_BLOCK_SIZE) {
         byte AuthTagBuf[WC_AES_BLOCK_SIZE];
@@ -300,6 +303,9 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
     ret = 0;
 
   out:
+
+    if (miter_needs_stop)
+        sg_miter_stop(&miter);
 
     wc_AesFree(aes);
     free(aes);
@@ -1191,6 +1197,8 @@ retry:
         wc_FreeRng(&drbg->rng);
         need_reenable_vec = (DISABLE_VECTOR_REGISTERS() == 0);
         ret = wc_InitRng(&drbg->rng);
+        if (need_reenable_vec)
+            REENABLE_VECTOR_REGISTERS();
         if (ret == 0) {
             pr_warn("WARNING: reinitialized DRBG #%d after RNG_FAILURE_E with status %u.", raw_smp_processor_id(), cur_rng_status);
             goto retry;

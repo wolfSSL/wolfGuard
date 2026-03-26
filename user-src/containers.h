@@ -119,9 +119,16 @@ static inline void free_wgdevice(struct wgdevice *dev)
 	for (struct wgpeer *peer = dev->first_peer, *np = peer ? peer->next_peer : NULL; peer; peer = np, np = peer ? peer->next_peer : NULL) {
 		for (struct wgallowedip *allowedip = peer->first_allowedip, *na = allowedip ? allowedip->next_allowedip : NULL; allowedip; allowedip = na, na = allowedip ? allowedip->next_allowedip : NULL)
 			free(allowedip);
+		memset(peer->preshared_key, 0, sizeof peer->preshared_key);
 		free(peer);
 	}
+	memset(dev->private_key, 0, sizeof dev->private_key);
 	free(dev);
+}
+
+static inline void memzero_explicit(void *p, size_t len) {
+    static void *(* const volatile memset_func)(void *, int, size_t) = memset;
+    (void)memset_func(p, 0, len);
 }
 
 #endif

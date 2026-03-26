@@ -77,8 +77,8 @@ int pubkey_main(int argc, char *argv[])
 
 out:
 
-	memset(privkey_base64, 0, sizeof privkey_base64);
-	memset(privkey, 0, sizeof privkey);
+	memzero_explicit(privkey_base64, sizeof privkey_base64);
+	memzero_explicit(privkey, sizeof privkey);
 	free(pubkey);
 	free(pubkey_base64);
 
@@ -197,8 +197,8 @@ out:
 		wc_ecc_free(&key_ecc);
 	if (rng_inited)
 		wc_FreeRng(&rng);
-	memset(key, 0, sizeof(key));
-	memset(base64, 0, sizeof(base64));
+	memzero_explicit(key, sizeof(key));
+	memzero_explicit(base64, sizeof(base64));
 
 	return ret;
 }

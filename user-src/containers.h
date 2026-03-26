@@ -126,4 +126,9 @@ static inline void free_wgdevice(struct wgdevice *dev)
 	free(dev);
 }
 
+static inline void memzero_explicit(void *p, size_t len) {
+    static void *(* const volatile memset_func)(void *, int, size_t) = memset;
+    (void)memset_func(p, 0, len);
+}
+
 #endif

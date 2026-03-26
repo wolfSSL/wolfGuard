@@ -66,10 +66,10 @@ int genkey_main(int argc, char *argv[])
 
 out:
 
-	memset(privkey, 0, privkey_len);
+	memzero_explicit(privkey, privkey_len);
 	free(privkey);
 	if (privkey_base64) {
-		memset(privkey_base64, 0, privkey_base64_len);
+		memzero_explicit(privkey_base64, privkey_base64_len);
 		free(privkey_base64);
 	}
 
@@ -113,10 +113,10 @@ int genpsk_main(int argc, char *argv[])
 
 out:
 
-	memset(psk, 0, psk_len);
+	memzero_explicit(psk, psk_len);
 	free(psk);
 	if (psk_base64) {
-		memset(psk_base64, 0, psk_base64_len);
+		memzero_explicit(psk_base64, psk_base64_len);
 		free(psk_base64);
 	}
 
@@ -193,8 +193,8 @@ int genkey_main(int argc, char *argv[])
 
 out:
 
-	memset(exported_private, 0, sizeof(exported_private));
-	memset(exported_private_base64, 0, sizeof(exported_private_base64));
+	memzero_explicit(exported_private, sizeof(exported_private));
+	memzero_explicit(exported_private_base64, sizeof(exported_private_base64));
 	if (rng_inited)
 		wc_FreeRng(&rng);
 	if (key_inited)
@@ -239,8 +239,8 @@ int genpsk_main(int argc, char *argv[])
 
 out:
 
-	memset(psk, 0, sizeof psk);
-	memset(psk_base64, 0, sizeof psk_base64);
+	memzero_explicit(psk, sizeof psk);
+	memzero_explicit(psk_base64, sizeof psk_base64);
 	if (rng_inited)
 		wc_FreeRng(&rng);
 

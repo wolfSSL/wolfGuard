@@ -289,7 +289,7 @@ static void pretty_print(struct wgdevice *device)
 		if (peer->next_peer)
 			terminal_printf("\n");
 	}
-	memset(base64_buf, 0, sizeof base64_buf);
+	memzero_explicit(base64_buf, sizeof base64_buf);
 }
 
 static void dump_print(struct wgdevice *device, bool with_interface)
@@ -330,7 +330,7 @@ static void dump_print(struct wgdevice *device, bool with_interface)
 		else
 			printf("off\n");
 	}
-	memset(base64_buf, 0, sizeof base64_buf);
+	memzero_explicit(base64_buf, sizeof base64_buf);
 }
 
 static bool ugly_print(struct wgdevice *device, const char *param, bool with_interface)
@@ -349,7 +349,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 		if (with_interface)
 			printf("%s\t", device->name);
 		printf("%s\n", maybe_private_key(device->private_key, base64_buf, device->flags & WGDEVICE_HAS_PRIVATE_KEY));
-		memset(base64_buf, 0, sizeof base64_buf);
+		memzero_explicit(base64_buf, sizeof base64_buf);
 	} else if (!strcmp(param, "listen-port")) {
 		if (with_interface)
 			printf("%s\t", device->name);
@@ -410,7 +410,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 			printf("%s\t", public_key(peer->public_key));
 			printf("%s\n", maybe_preshared_key(peer->preshared_key, base64_buf, peer->flags & WGPEER_HAS_PRESHARED_KEY));
 		}
-		memset(base64_buf, 0, sizeof base64_buf);
+		memzero_explicit(base64_buf, sizeof base64_buf);
 	} else if (!strcmp(param, "peers")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)

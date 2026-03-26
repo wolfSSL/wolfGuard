@@ -109,7 +109,7 @@ static inline bool parse_private_key(uint8_t key[static WG_PRIVATE_KEY_LEN], con
 {
 	if (!wg_from_base64(key, WG_PRIVATE_KEY_LEN, value, value_len)) {
 		fprintf(stderr, "Private key is not the correct length or format.\n");
-		memset(key, 0, WG_PRIVATE_KEY_LEN);
+		memzero_explicit(key, WG_PRIVATE_KEY_LEN);
 		return false;
 	}
 	return true;
@@ -129,7 +129,7 @@ static inline bool parse_preshared_key(uint8_t key[static WG_SYMMETRIC_KEY_LEN],
 {
 	if (!wg_from_base64(key, WG_SYMMETRIC_KEY_LEN, value, value_len)) {
 		fprintf(stderr, "Preshared key is not the correct length or format.\n");
-		memset(key, 0, WG_SYMMETRIC_KEY_LEN);
+		memzero_explicit(key, WG_SYMMETRIC_KEY_LEN);
 		return false;
 	}
 	return true;
@@ -157,7 +157,7 @@ static bool parse_keyfile(uint8_t *key, size_t key_len, const char *path)
 	if (fread(dst, WG_BASE64_LEN(key_len) - 1, 1, f) != 1) {
 		/* If we're at the end and we didn't read anything, we're /dev/null or an empty file. */
 		if (!ferror(f) && feof(f) && !ftell(f)) {
-			memset(key, 0, key_len);
+			memzero_explicit(key, key_len);
 			ret = true;
 			goto out;
 		}
@@ -180,7 +180,7 @@ static bool parse_keyfile(uint8_t *key, size_t key_len, const char *path)
 
 out:
 	if (dst) {
-		memset(dst, 0, WG_BASE64_LEN(key_len) - 1);
+		memzero_explicit(dst, WG_BASE64_LEN(key_len) - 1);
 		free(dst);
 	}
 	fclose(f);

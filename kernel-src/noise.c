@@ -906,7 +906,7 @@ out:
 bool wg_noise_handshake_begin_session(struct noise_handshake *handshake,
 				      struct noise_keypairs *keypairs)
 {
-	struct noise_keypair *new_keypair;
+	struct noise_keypair *new_keypair = NULL;
 	bool ret = false;
 
 	down_write(&handshake->lock);
@@ -944,12 +944,15 @@ bool wg_noise_handshake_begin_session(struct noise_handshake *handshake,
 		ret = wg_index_hashtable_replace(
 			handshake->entry.peer->device->index_hashtable,
 			&handshake->entry, &new_keypair->entry);
-	} else {
-		kfree_sensitive(new_keypair);
+		new_keypair = NULL; /* successfully added to keypairs */
 	}
 	rcu_read_unlock_bh();
 
 out:
 	up_write(&handshake->lock);
+
+	if (new_keypair)
+		kfree_sensitive(new_keypair);
+
 	WC_DEBUG_PR_FALSE_RET(ret);
 }

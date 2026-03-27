@@ -296,13 +296,13 @@ bool wg_to_base64(char *base64, size_t base64_len, const uint8_t *raw, size_t ra
     ret = Base64_Encode_NoNl(raw, (word32)raw_len, (byte *)base64, &base64_len_out);
     if (ret != 0) {
         fprintf(stderr, "Base64_Encode_NoNl() returned error: %s.\n", wc_GetErrorString(ret));
-        memset(base64, 0, (word32)base64_len);
+        memzero_explicit(base64, base64_len);
         return false;
     }
     if (base64_len_out != (word32)base64_len - 1)
     {
         fprintf(stderr, "Base64_Encode_NoNl() returned unexpected output length %u.\n", base64_len_out);
-        memset(base64, 0, (word32)base64_len);
+        memzero_explicit(base64, base64_len);
         return false;
     }
     return true;
@@ -317,14 +317,14 @@ bool wg_from_base64(uint8_t *raw, size_t raw_len, const char *base64, size_t bas
     ret = Base64_Decode((byte *)base64, base64_len, raw, &raw_len_out);
     if (ret != 0) {
         fprintf(stderr, "Base64_Decode() returned error: %s.\n", wc_GetErrorString(ret));
-        memset(raw, 0, (word32)raw_len);
+        memzero_explicit(raw, raw_len);
         return false;
     }
 
     if (raw_len_out != (word32)raw_len)
     {
         fprintf(stderr, "Base64_Decode() returned unexpected output length %u.\n", raw_len_out);
-        memset(raw, 0, (word32)raw_len);
+        memzero_explicit(raw, raw_len);
         return false;
     }
     return true;
@@ -338,7 +338,7 @@ bool wg_to_hex(char *hex, size_t hex_len, const uint8_t *raw, size_t raw_len) {
     if ((Base16_Encode(raw, (word32)raw_len, (byte *)hex, &hex_len_out) != 0) ||
         (hex_len_out != (word32)hex_len))
     {
-        memset(hex, 0, (word32)hex_len);
+        memzero_explicit(hex, hex_len);
         return false;
     }
     return true;
@@ -352,7 +352,7 @@ bool wg_from_hex(uint8_t *raw, size_t raw_len, const char *hex, size_t hex_len) 
     if ((Base16_Decode((byte *)hex, hex_len, raw, &raw_len_out) != 0) ||
         (raw_len_out != (word32)raw_len))
     {
-        memset(raw, 0, (word32)raw_len);
+        memzero_explicit(raw, raw_len);
         return false;
     }
     return true;

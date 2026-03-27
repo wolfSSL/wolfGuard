@@ -541,12 +541,15 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
 
         {
             word32 outLen = (word32)public_len;
+#ifndef HAVE_COMP_KEY
+            if (compressed)
+                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
+#endif
+
             PRIVATE_KEY_UNLOCK();
 #ifdef HAVE_COMP_KEY
             ret = wc_ecc_export_x963_ex(key, public, &outLen, compressed);
 #else
-            if (compressed)
-                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
             ret = wc_ecc_export_x963(key, public, &outLen);
 #endif
             PRIVATE_KEY_LOCK();
@@ -1016,8 +1019,10 @@ void wc_linuxkm_drbg_ctx_clear(struct wc_linuxkm_drbg_ctx * ctx)
                 ctx->n_rngs = 0;
                 return;
             }
-            else
+            else {
+                wc_ForceZero(ctx->rngs[i].rnd_pool, sizeof ctx->rngs[i].rnd_pool);
                 wc_FreeRng(&ctx->rngs[i].rng);
+            }
         }
         free(ctx->rngs);
         ctx->rngs = NULL;

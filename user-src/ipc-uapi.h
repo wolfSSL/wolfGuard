@@ -398,9 +398,12 @@ static int userspace_get_device(struct wgdevice **out, const char *iface)
 				if (inet_pton(AF_INET, ip, &allowedip->ip4) == 1)
 					allowedip->family = AF_INET;
 			}
-			allowedip->cidr = strtoul(mask, &end, 10);
-			if (*end || allowedip->family == AF_UNSPEC || (allowedip->family == AF_INET6 && allowedip->cidr > 128) || (allowedip->family == AF_INET && allowedip->cidr > 32))
-				break;
+			{
+				unsigned long cidr = strtoul(mask, &end, 10);
+				if (*end || allowedip->family == AF_UNSPEC || (allowedip->family == AF_INET6 && cidr > 128) || (allowedip->family == AF_INET && cidr > 32))
+					break;
+				allowedip->cidr = (uint8_t)cidr;
+			}
 		} else if (peer && !strcmp(key, "last_handshake_time_sec"))
 			peer->last_handshake_time.tv_sec = NUM(0x7fffffffffffffffULL);
 		else if (peer && !strcmp(key, "last_handshake_time_nsec"))

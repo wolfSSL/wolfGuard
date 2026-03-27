@@ -168,8 +168,10 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 				    &peer->endpoint.addr);
 		{
 			int ret = wg_packet_send_handshake_response(peer);
-			if (ret < 0)
+			if (ret < 0) {
+				wg_peer_put(peer);
 				return ret;
+			}
 		}
 		break;
 	}

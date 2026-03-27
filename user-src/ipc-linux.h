@@ -316,7 +316,7 @@ static int parse_allowedips(const struct nlattr *attr, void *data)
 		peer->last_allowedip = new_allowedip;
 	}
 	ret = mnl_attr_parse_nested(attr, parse_allowedip, new_allowedip);
-	if (!ret)
+	if (ret != MNL_CB_OK)
 		return ret;
 	if (!((new_allowedip->family == AF_INET && new_allowedip->cidr <= 32) || (new_allowedip->family == AF_INET6 && new_allowedip->cidr <= 128)))
 		return MNL_CB_ERROR;
@@ -395,7 +395,7 @@ static int parse_peers(const struct nlattr *attr, void *data)
 		device->last_peer = new_peer;
 	}
 	ret = mnl_attr_parse_nested(attr, parse_peer, new_peer);
-	if (!ret)
+	if (ret != MNL_CB_OK)
 		return ret;
 	if (!(new_peer->flags & WGPEER_HAS_PUBLIC_KEY))
 		return MNL_CB_ERROR;
@@ -606,7 +606,7 @@ out:
 		mnlg_socket_close(nlg);
 	if (ret) {
 		if (*privkey) {
-			memset(*privkey, 0, *privkey_len);
+			memzero_explicit(*privkey, *privkey_len);
 			free(*privkey);
 			*privkey = 0;
 		}
@@ -767,7 +767,7 @@ out:
 		mnlg_socket_close(nlg);
 	if (ret) {
 		if (*psk) {
-			memset(*psk, 0, *psk_len);
+			memzero_explicit(*psk, *psk_len);
 			free(*psk);
 			*psk = 0;
 		}

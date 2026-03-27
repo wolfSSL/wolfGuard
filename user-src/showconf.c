@@ -109,6 +109,7 @@ int showconf_main(int argc, char *argv[])
 	ret = 0;
 
 cleanup:
+	memzero_explicit(base64, sizeof base64);
 	free_wgdevice(device);
 	return ret;
 }

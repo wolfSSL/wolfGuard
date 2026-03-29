@@ -144,7 +144,7 @@ static inline int wc_sha256_oneshot2(byte *out, const byte *message1, const size
 
 static inline u64 wc_u64_keyed_hash(const byte *key, const size_t key_len, const byte *message, const size_t message_len) {
     u64 ret[WC_SHA256_DIGEST_SIZE / sizeof(u64)];
-    if (wc_sha256_oneshot2((byte *)ret, key, key_len, message, (word32)message_len) < 0)
+    if (wc_sha256_oneshot2((byte *)ret, key, key_len, message, message_len) < 0)
         return ~0UL;
     else
         return ret[0];
@@ -152,7 +152,7 @@ static inline u64 wc_u64_keyed_hash(const byte *key, const size_t key_len, const
 
 static inline u32 wc_u32_keyed_hash(const byte *key, const size_t key_len, const byte *message, const size_t message_len) {
     u32 ret[WC_SHA256_DIGEST_SIZE / sizeof(u32)];
-    if (wc_sha256_oneshot2((byte *)ret, key, key_len, message, (word32)message_len) < 0)
+    if (wc_sha256_oneshot2((byte *)ret, key, key_len, message, message_len) < 0)
         return ~0U;
     else
         return ret[0];

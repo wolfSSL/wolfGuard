@@ -282,6 +282,7 @@ static void wg_destruct(struct net_device *dev)
 #endif
 	free_percpu(wg->incoming_handshakes_worker);
 	kvfree(wg->index_hashtable);
+        memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	mutex_unlock(&wg->device_update_lock);
 
@@ -360,6 +361,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 	rcu_assign_pointer(wg->creating_net, link_net);
 #else
+        (void)tb;
+        (void)data;
 	rcu_assign_pointer(wg->creating_net, src_net);
 #endif
 	init_rwsem(&wg->static_identity.lock);
@@ -472,6 +475,7 @@ err_free_index_hashtable:
 #endif
 	kvfree(wg->index_hashtable);
 err_free_peer_hashtable:
+        memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	WC_DEBUG_PR_NEG_RET(ret);
 }

@@ -473,6 +473,7 @@ static void coalesce_peers(struct wgdevice *device)
 		}
 		old_next_peer = peer->next_peer;
 		peer->next_peer = old_next_peer->next_peer;
+		memzero_explicit(old_next_peer->preshared_key, sizeof old_next_peer->preshared_key);
 		free(old_next_peer);
 	}
 }

@@ -670,6 +670,10 @@ static int wg_nl_generate_privkey(struct sk_buff *skb, struct genl_info *info)
 
 	ret = genlmsg_reply(reply, info);
 
+        reply = NULL; /* genlmsg_reply() always consumes the reply via
+                       * netlink_unicast().
+                       */
+
 out:
 
 	if (private) {
@@ -680,7 +684,7 @@ out:
 		free(public);
 	}
 
-	if (reply && ret) {
+	if (reply) {
 		if (hdr)
 			genlmsg_cancel(reply, hdr);
 		nlmsg_free(reply);
@@ -749,6 +753,10 @@ static int wg_nl_derive_pubkey(struct sk_buff *skb, struct genl_info *info)
 
 	ret = genlmsg_reply(reply, info);
 
+        reply = NULL; /* genlmsg_reply() always consumes the reply via
+                       * netlink_unicast().
+                       */
+
 out:
 
 	if (private) {
@@ -761,7 +769,7 @@ out:
 		free(public);
 	}
 
-	if (reply && ret) {
+	if (reply) {
 		if (hdr)
 			genlmsg_cancel(reply, hdr);
 		nlmsg_free(reply);
@@ -815,6 +823,10 @@ static int wg_nl_generate_psk(struct sk_buff *skb, struct genl_info *info)
 
 	ret = genlmsg_reply(reply, info);
 
+        reply = NULL; /* genlmsg_reply() always consumes the reply via
+                       * netlink_unicast().
+                       */
+
 out:
 
 	if (psk) {
@@ -822,7 +834,7 @@ out:
 		free(psk);
 	}
 
-	if (reply && ret) {
+	if (reply) {
 		if (hdr)
 			genlmsg_cancel(reply, hdr);
 		nlmsg_free(reply);

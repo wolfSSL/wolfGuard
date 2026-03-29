@@ -287,7 +287,7 @@ static inline bool parse_endpoint(struct sockaddr *endpoint, const char *value)
 			#ifdef EAI_NODATA
 				ret == EAI_NODATA ||
 			#endif
-				(retries <= 0)) {
+				(retries == 0) || (retries == 1)) {
 			free(mutable);
 			fprintf(stderr, "%s: `%s'\n", ret == EAI_SYSTEM ? strerror(errno) : gai_strerror(ret), value);
 			return false;

@@ -112,6 +112,11 @@ struct wgdevice {
 #define for_each_wgpeer(__dev, __peer) for ((__peer) = (__dev)->first_peer; (__peer); (__peer) = (__peer)->next_peer)
 #define for_each_wgallowedip(__peer, __allowedip) for ((__allowedip) = (__peer)->first_allowedip; (__allowedip); (__allowedip) = (__allowedip)->next_allowedip)
 
+static inline void memzero_explicit(void *p, size_t len) {
+    static void *(* const volatile memset_func)(void *, int, size_t) = memset;
+    (void)memset_func(p, 0, len);
+}
+
 static inline void free_wgdevice(struct wgdevice *dev)
 {
 	if (!dev)
@@ -119,16 +124,11 @@ static inline void free_wgdevice(struct wgdevice *dev)
 	for (struct wgpeer *peer = dev->first_peer, *np = peer ? peer->next_peer : NULL; peer; peer = np, np = peer ? peer->next_peer : NULL) {
 		for (struct wgallowedip *allowedip = peer->first_allowedip, *na = allowedip ? allowedip->next_allowedip : NULL; allowedip; allowedip = na, na = allowedip ? allowedip->next_allowedip : NULL)
 			free(allowedip);
-		memset(peer->preshared_key, 0, sizeof peer->preshared_key);
+		memzero_explicit(peer->preshared_key, sizeof peer->preshared_key);
 		free(peer);
 	}
-	memset(dev->private_key, 0, sizeof dev->private_key);
+	memzero_explicit(dev->private_key, sizeof dev->private_key);
 	free(dev);
-}
-
-static inline void memzero_explicit(void *p, size_t len) {
-    static void *(* const volatile memset_func)(void *, int, size_t) = memset;
-    (void)memset_func(p, 0, len);
 }
 
 #endif

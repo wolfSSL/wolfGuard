@@ -24,8 +24,9 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 {
 	struct message_handshake_initiation packet;
 	int ret;
+	u64 cur_last_sent_handshake = atomic64_read(&peer->last_sent_handshake);
 
-	if (!wg_birthdate_has_expired(atomic64_read(&peer->last_sent_handshake),
+	if (!wg_birthdate_has_expired(cur_last_sent_handshake,
 				      REKEY_TIMEOUT))
 		return 0; /* This function is rate limited. */
 
@@ -46,8 +47,10 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 		}
 		wg_timers_handshake_initiated(peer);
 	}
-	else
+	else {
+		atomic64_set(&peer->last_sent_handshake, cur_last_sent_handshake);
 		ret = -ECANCELED;
+	}
 
 	memzero_explicit(&packet, sizeof packet);
 
@@ -106,9 +109,12 @@ int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 
 	if (wg_noise_handshake_create_response(&packet, &peer->handshake)) {
 		ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
-		if ((ret == 0) &&
-		    wg_noise_handshake_begin_session(&peer->handshake,
-						     &peer->keypairs)) {
+		if (ret == 0) {
+			if (! wg_noise_handshake_begin_session(&peer->handshake,
+							       &peer->keypairs))
+				ret = -ECANCELED;
+		}
+		if (ret == 0) {
 			wg_timers_session_derived(peer);
 			wg_timers_any_authenticated_packet_traversal(peer);
 			wg_timers_any_authenticated_packet_sent(peer);

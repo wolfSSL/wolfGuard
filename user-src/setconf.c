@@ -89,10 +89,12 @@ static bool sync_conf(struct wgdevice *file)
 			}
 			peer->flags = WGPEER_REMOVE_ME;
 			memcpy(peer->public_key, pubkeys[i].pubkey, WG_PUBLIC_KEY_LEN);
-			peer->next_peer = file->first_peer;
-			file->first_peer = peer;
-			if (!file->last_peer)
-				file->last_peer = peer;
+			if (! file->first_peer)
+				file->first_peer = peer;
+			if (file->last_peer)
+				file->last_peer->next_peer = peer;
+			file->last_peer = peer;
+
 		}
 	}
 	free_wgdevice(runtime);

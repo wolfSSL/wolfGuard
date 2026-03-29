@@ -361,6 +361,8 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 	rcu_assign_pointer(wg->creating_net, link_net);
 #else
+        (void)tb;
+        (void)data;
 	rcu_assign_pointer(wg->creating_net, src_net);
 #endif
 	init_rwsem(&wg->static_identity.lock);

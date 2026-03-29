@@ -215,8 +215,10 @@ int wg_ratelimiter_init(void)
 #endif
 
 	ret = wc_get_random_bytes(key, sizeof(key));
-	if (ret != 0)
+	if (ret != 0) {
+		ret = -EAGAIN;
 		goto err_kmemcache;
+	}
 
 	queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 
@@ -240,7 +242,7 @@ err_kmemcache:
 err:
 	--init_refcnt;
 	mutex_unlock(&init_lock);
-	return -ENOMEM;
+	return ret;
 }
 
 void wg_ratelimiter_uninit(void)
@@ -255,6 +257,7 @@ void wg_ratelimiter_uninit(void)
 	cancel_delayed_work_sync(&gc_work);
 	wg_ratelimiter_gc_entries(NULL);
 	rcu_barrier();
+	memzero_explicit(key, sizeof key);
 	kvfree(table_v4);
 #if IS_ENABLED(CONFIG_IPV6)
 	kvfree(table_v6);

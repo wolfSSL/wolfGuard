@@ -111,6 +111,8 @@ static int __must_check make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 		return -ENOMEM;
 
 	ret = wc_HmacInit(wc_hmac, NULL /* heap */, INVALID_DEVID);
+	if (ret < 0)
+		goto out_hmac_uninited;
 
 	if ((ret == 0) && wg_birthdate_has_expired(checker->secret_birthdate,
 				     COOKIE_SECRET_MAX_AGE)) {
@@ -142,6 +144,8 @@ static int __must_check make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 	}
 
 	wc_HmacFree(wc_hmac);
+
+out_hmac_uninited:
 
 	free(wc_hmac);
 
@@ -179,6 +183,8 @@ enum cookie_mac_state __must_check wg_cookie_validate_packet(struct cookie_check
 	if (ConstantCompare(computed_mac, macs->mac2, COOKIE_LEN))
 		goto out;
 
+	memzero_explicit(cookie, sizeof cookie);
+
 	ret = VALID_MAC_WITH_COOKIE_BUT_RATELIMITED;
 	if (!wg_ratelimiter_allow(skb, dev_net(checker->device->dev)))
 		goto out;
@@ -186,6 +192,9 @@ enum cookie_mac_state __must_check wg_cookie_validate_packet(struct cookie_check
 	ret = VALID_MAC_WITH_COOKIE;
 
 out:
+
+	memzero_explicit(computed_mac, sizeof computed_mac);
+
 	return ret;
 }
 
@@ -241,6 +250,8 @@ int __must_check wg_cookie_message_create(struct message_handshake_cookie *dst,
 					dst->nonce, sizeof(dst->nonce),
 						macs->mac1, COOKIE_LEN, NOISE_AUTHTAG_LEN);
 
+	memzero_explicit(cookie, sizeof cookie);
+
 	return ret;
 }
 
@@ -284,6 +295,8 @@ int __must_check wg_cookie_message_consume(struct message_handshake_cookie *src,
 				    wg->dev->name, ret);
 		ret = -EBADMSG;
 	}
+
+	memzero_explicit(cookie, sizeof cookie);
 
 out:
 	wg_peer_put(peer);

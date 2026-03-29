@@ -39,8 +39,10 @@ int wc_hmac_oneshot_prealloc(struct Hmac *wc_hmac, const int type, byte *out, co
             WC_DEBUG_PR_NEG_RET(-EINVAL);
 
 	ret = wc_HmacInit(wc_hmac, NULL /* heap */, INVALID_DEVID);
-	if (ret == 0)
-		ret = wc_HmacSetKey(wc_hmac, type, key, (word32)key_len);
+        if (ret < 0)
+            WC_DEBUG_PR_NEG_RET(ret);
+
+        ret = wc_HmacSetKey(wc_hmac, type, key, (word32)key_len);
 	if (ret == 0)
 		ret = wc_HmacUpdate(wc_hmac, message, (word32)message_len);
 	if (ret == 0)
@@ -194,21 +196,21 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
     {
         ret = -EINVAL;
         WC_DEBUG_PR_CODEPOINT();
-        goto out;
+        goto out_aes_uninited;
     }
 
     aes = (Aes *)XMALLOC(sizeof *aes, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     if (! aes) {
         ret = -ENOMEM;
         WC_DEBUG_PR_CODEPOINT();
-        goto out;
+        goto out_aes_uninited;
     }
 
     ret = wc_AesInit(aes, NULL, INVALID_DEVID);
     if (ret != 0) {
         ret = -EINVAL;
         WC_DEBUG_PR_CODEPOINT();
-        goto out;
+        goto out_aes_uninited;
     }
 
     memset(full_nonce, 0, sizeof(full_nonce));
@@ -304,10 +306,13 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
 
   out:
 
+    wc_AesFree(aes);
+
+  out_aes_uninited:
+
     if (miter_needs_stop)
         sg_miter_stop(&miter);
 
-    wc_AesFree(aes);
     free(aes);
 
     WC_DEBUG_PR_IF_NEG(ret);
@@ -430,6 +435,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
                                    ad, (word32)ad_len);
             if (ret == 0)
                 scatterwalk_map_and_copy(buf, src, 0, src_len, 1);
+            wc_ForceZero(buf, src_len + WC_AES_BLOCK_SIZE);
         }
         else {
             scatterwalk_map_and_copy(buf, src, 0, src_len, 0);
@@ -440,6 +446,8 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
                                    ad, (word32)ad_len);
             if (ret == 0)
                 scatterwalk_map_and_copy(buf, src, 0, src_len + WC_AES_BLOCK_SIZE, 1);
+            else
+                wc_ForceZero(buf, src_len + WC_AES_BLOCK_SIZE);
         }
         free(buf);
     }
@@ -642,12 +650,14 @@ int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
 
         {
             word32 outLen = (word32)public_len;
+#ifndef HAVE_COMP_KEY
+            if (compressed)
+                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
+#endif
             PRIVATE_KEY_UNLOCK();
 #ifdef HAVE_COMP_KEY
             ret = wc_ecc_export_x963_ex(key, public, &outLen, compressed);
 #else
-            if (compressed)
-                WC_DEBUG_PR_NEG_RET(BAD_FUNC_ARG);
             ret = wc_ecc_export_x963(key, public, &outLen);
 #endif
             PRIVATE_KEY_LOCK();

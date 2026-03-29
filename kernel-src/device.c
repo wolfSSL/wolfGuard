@@ -282,6 +282,7 @@ static void wg_destruct(struct net_device *dev)
 #endif
 	free_percpu(wg->incoming_handshakes_worker);
 	kvfree(wg->index_hashtable);
+        memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	mutex_unlock(&wg->device_update_lock);
 
@@ -472,6 +473,7 @@ err_free_index_hashtable:
 #endif
 	kvfree(wg->index_hashtable);
 err_free_peer_hashtable:
+        memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	WC_DEBUG_PR_NEG_RET(ret);
 }

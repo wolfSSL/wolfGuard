@@ -117,6 +117,7 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 	static u64 last_under_load;
 	bool packet_needs_cookie;
 	bool under_load;
+	int ret;
 
 	if (SKB_TYPE_LE32(skb) == cpu_to_le32(MESSAGE_HANDSHAKE_COOKIE)) {
 		net_dbg_skb_ratelimited("%s: Receiving cookie response from %pISpfsc\n",
@@ -167,12 +168,13 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 				    wg->dev->name, peer->internal_id,
 				    &peer->endpoint.addr);
 		{
-			int ret = wg_packet_send_handshake_response(peer);
+			ret = wg_packet_send_handshake_response(peer);
 			if (ret < 0) {
 				wg_peer_put(peer);
 				return ret;
 			}
 		}
+		ret = 0;
 		break;
 	}
 	case cpu_to_le32(MESSAGE_HANDSHAKE_RESPONSE): {
@@ -204,7 +206,10 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 			 * immediate confirmation of the session.
 			 */
 			wg_packet_send_keepalive(peer);
+			ret = 0;
 		}
+		else
+			ret = -ECANCELED;
 		break;
 	}
 	}
@@ -222,7 +227,7 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 	wg_timers_any_authenticated_packet_traversal(peer);
 	wg_peer_put(peer);
 
-	return 0;
+	return ret;
 }
 
 void wg_packet_handshake_receive_worker(struct work_struct *work)

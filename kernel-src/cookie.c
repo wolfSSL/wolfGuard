@@ -117,8 +117,9 @@ static int __must_check make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 	if ((ret == 0) && wg_birthdate_has_expired(checker->secret_birthdate,
 				     COOKIE_SECRET_MAX_AGE)) {
 		down_write(&checker->secret_lock);
-		checker->secret_birthdate = ktime_get_coarse_boottime_ns();
 		ret = wc_get_random_bytes(checker->secret, NOISE_HASH_LEN);
+		if (ret == 0)
+			checker->secret_birthdate = ktime_get_coarse_boottime_ns();
 		up_write(&checker->secret_lock);
 	}
 

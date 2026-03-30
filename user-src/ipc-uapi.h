@@ -159,7 +159,7 @@ static int userspace_set_device(struct wgdevice *dev)
 
 out:
 
-	memset(hex, 0, sizeof hex);
+	memzero_explicit(hex, sizeof hex);
 	fclose(f);
 	errno = -ret;
 	return ret;

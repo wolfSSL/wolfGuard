@@ -24,12 +24,15 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 {
 	struct message_handshake_initiation packet;
 	int ret;
+	u64 cur_last_sent_handshake = atomic64_read(&peer->last_sent_handshake);
+	u64 speculative_last_sent_handshake;
 
-	if (!wg_birthdate_has_expired(atomic64_read(&peer->last_sent_handshake),
+	if (!wg_birthdate_has_expired(cur_last_sent_handshake,
 				      REKEY_TIMEOUT))
 		return 0; /* This function is rate limited. */
 
-	atomic64_set(&peer->last_sent_handshake, ktime_get_coarse_boottime_ns());
+	speculative_last_sent_handshake = ktime_get_coarse_boottime_ns();
+	atomic64_set(&peer->last_sent_handshake, speculative_last_sent_handshake);
 	net_dbg_ratelimited("%s: Sending handshake initiation to peer %llu (%pISpfsc)\n",
 			    peer->device->dev->name, peer->internal_id,
 			    &peer->endpoint.addr);
@@ -37,17 +40,26 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 	if (wg_noise_handshake_create_initiation(&packet, &peer->handshake)) {
 		ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
 		if (ret == 0) {
-			wg_timers_any_authenticated_packet_traversal(peer);
-			wg_timers_any_authenticated_packet_sent(peer);
-			atomic64_set(&peer->last_sent_handshake,
-				     ktime_get_coarse_boottime_ns());
-			(void)wg_socket_send_buffer_to_peer(peer, &packet, sizeof(packet),
+			ret = wg_socket_send_buffer_to_peer(peer, &packet, sizeof(packet),
 							    HANDSHAKE_DSCP);
+			if (ret == 0) {
+				atomic64_set(&peer->last_sent_handshake,
+					     ktime_get_coarse_boottime_ns());
+				wg_timers_any_authenticated_packet_traversal(peer);
+				wg_timers_any_authenticated_packet_sent(peer);
+			}
 		}
-		wg_timers_handshake_initiated(peer);
+		wg_timers_handshake_initiated(peer); /* restart retry timer even
+						      * if send failed.
+						      */
 	}
 	else
 		ret = -ECANCELED;
+
+	if (ret != 0)
+		(void)atomic64_cmpxchg_relaxed(&peer->last_sent_handshake,
+					       speculative_last_sent_handshake,
+					       cur_last_sent_handshake);
 
 	memzero_explicit(&packet, sizeof packet);
 
@@ -60,8 +72,19 @@ void wg_packet_handshake_send_worker(struct work_struct *work)
 					    transmit_handshake_work);
 	int ret = wg_packet_send_handshake_initiation(peer);
 	wg_peer_put(peer);
-	if (ret != 0)
-		pr_err("wg_packet_handshake_send_worker(): wg_packet_send_handshake_initiation() returned %d.\n", ret);
+	if (ret != 0) {
+		switch (ret) {
+		case -ENETUNREACH:
+		case -EHOSTUNREACH:
+		case -ENETDOWN:
+		case -EAGAIN:
+			pr_info_ratelimited("wg_packet_handshake_send_worker(): wg_packet_send_handshake_initiation() returned %d.\n", ret);
+			break;
+		default:
+			pr_err_ratelimited("wg_packet_handshake_send_worker(): wg_packet_send_handshake_initiation() returned %d.\n", ret);
+			break;
+		}
+	}
 }
 
 void wg_packet_send_queued_handshake_initiation(struct wg_peer *peer,
@@ -106,9 +129,12 @@ int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 
 	if (wg_noise_handshake_create_response(&packet, &peer->handshake)) {
 		ret = wg_cookie_add_mac_to_packet(&packet, sizeof(packet), peer);
-		if ((ret == 0) &&
-		    wg_noise_handshake_begin_session(&peer->handshake,
-						     &peer->keypairs)) {
+		if (ret == 0) {
+			if (! wg_noise_handshake_begin_session(&peer->handshake,
+							       &peer->keypairs))
+				ret = -ECANCELED;
+		}
+		if (ret == 0) {
 			wg_timers_session_derived(peer);
 			wg_timers_any_authenticated_packet_traversal(peer);
 			wg_timers_any_authenticated_packet_sent(peer);

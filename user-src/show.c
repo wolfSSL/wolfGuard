@@ -64,6 +64,7 @@ static void sort_peers(struct wgdevice *device)
 		peers[i - 1]->next_peer = peers[i];
 	}
 	peers[peer_count - 1]->next_peer = NULL;
+	device->last_peer = peers[peer_count - 1];
 	free(peers);
 }
 

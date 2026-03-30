@@ -423,7 +423,7 @@ static inline bool parse_allowedips(struct wgpeer *peer, struct wgallowedip **la
 		else if (new_allowedip->family == AF_INET6)
 			cidr = 128;
 		else
-			goto err;
+			goto err; /* defensive -- don't count on parse_ip() only succeeding for IPv4 and IPv6. */
 		new_allowedip->cidr = cidr;
 
 		if (!validate_netmask(new_allowedip))

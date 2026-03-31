@@ -152,7 +152,13 @@ static int send6(struct wg_device *wg, struct sk_buff *skb,
 			if (cache)
 				dst_cache_reset(cache);
 		}
-		dst = ipv6_stub->ipv6_dst_lookup_flow(sock_net(sock), sock, &fl,
+		/* 343d60aada (v4.16) adds net arg to ipv6_stub_impl.ipv6_dst_lookup,
+		 * c4e85f73af (v5.5) adds it to ip6_dst_lookup_flow() (sunrise for the
+		 * below code pattern), and ipv6_stub is slated for removal (along
+		 * with net/ipv6_stubs.h) circa v7.1, linux-next commit
+		 * 964870b4b9.
+		 */
+		dst = ip6_dst_lookup_flow(sock_net(sock), sock, &fl,
 						      NULL);
 		if (unlikely(IS_ERR(dst))) {
 			ret = PTR_ERR(dst);

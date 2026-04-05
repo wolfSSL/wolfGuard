@@ -827,6 +827,12 @@ int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx) {
 
 #ifdef LINUXKM_LKCAPI_REGISTER_HASH_DRBG_DEFAULT
 
+#ifdef WC_RNG_BANK_DEFAULT_SUPPORT
+    ret = wc_rng_bank_default_checkout(ctx);
+
+    if (ret != 0)
+        goto new_bank;
+#else /* !WC_RNG_BANK_DEFAULT_SUPPORT */
     struct crypto_rng *current_crypto_default_rng;
 
     ret = crypto_get_default_rng();
@@ -846,6 +852,8 @@ int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx) {
     }
 
     *ctx = (struct wc_rng_bank *)crypto_rng_ctx(current_crypto_default_rng);
+#endif /* !WC_RNG_BANK_DEFAULT_SUPPORT */
+
     wc_wg_drbg_is_global_default = 1;
 
     return 0;
@@ -886,9 +894,15 @@ void wc_linuxkm_drbg_ctx_clear(struct wc_rng_bank **ctx) {
 
 #ifdef LINUXKM_LKCAPI_REGISTER_HASH_DRBG_DEFAULT
     if (wc_wg_drbg_is_global_default) {
+#ifdef WC_RNG_BANK_DEFAULT_SUPPORT
+        int ret = wc_rng_bank_default_checkin(ctx);
+        if (ret != 0)
+            pr_err("ERROR: wc_rng_bank_default_checkin() in wc_linuxkm_drbg_ctx_clear() failed with code %d.\n", ret);
+#else /* !WC_RNG_BANK_DEFAULT_SUPPORT */
         *ctx = NULL;
-        wc_wg_drbg_is_global_default = 0;
         crypto_put_default_rng();
+#endif /* !WC_RNG_BANK_DEFAULT_SUPPORT */
+        wc_wg_drbg_is_global_default = 0;
     }
     else
 #endif

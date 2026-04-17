@@ -312,7 +312,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
     if (miter_needs_stop)
         sg_miter_stop(&miter);
 
-    free(aes);
+    XFREE(aes, NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
     WC_DEBUG_PR_IF_NEG(ret);
 
@@ -447,7 +447,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
             else
                 wc_ForceZero(buf, src_len + WC_AES_BLOCK_SIZE);
         }
-        free(buf);
+        XFREE(buf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
   out:
@@ -456,7 +456,7 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
 
   out_aes_uninited:
 
-    free(aes);
+    XFREE(aes, NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
     wc_ForceZero(full_nonce, sizeof full_nonce);
 

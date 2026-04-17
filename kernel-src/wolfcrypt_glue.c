@@ -1196,6 +1196,10 @@ int wc_linuxkm_drbg_generate(struct wc_linuxkm_drbg_ctx *ctx,
 retry:
 
 #if defined(HAVE_FIPS) && FIPS_VERSION_LT(6,0)
+    /* FIPS v5 does not expose an API to externally reseed the DRBG.
+     * The entropy input is therefore discarded here.  The DRBG output
+     * remains safe: it was properly seeded at initialization time.
+     */
     (void)src;
     (void)slen;
 #else

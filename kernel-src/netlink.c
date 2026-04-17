@@ -876,6 +876,13 @@ struct genl_ops genl_ops[] = {
 #endif
 		.flags = GENL_UNS_ADMIN_PERM
 	}, {
+		/* Key generation is offloaded to the kernel module and
+		 * therefore requires CAP_NET_ADMIN.  Users without this
+		 * privilege should either run via sudo/root, or build
+		 * with NO_IPC_LLCRYPTO=1 to use the userspace key
+		 * generation path, or ensure the wg-fips binary has the
+		 * appropriate file capabilities set (e.g. cap_net_admin+ep).
+		 */
 		.cmd = WG_CMD_GEN_PRIVKEY,
 		.doit = wg_nl_generate_privkey,
 		.policy = device_policy,

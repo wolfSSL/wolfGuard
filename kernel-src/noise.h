@@ -40,6 +40,9 @@ struct noise_keypair {
 	struct kref refcount;
 	struct rcu_head rcu;
 	u64 internal_id;
+	Aes aes_encrypt;
+	Aes aes_decrypt;
+	bool aes_inited;
 };
 
 struct noise_keypairs {
@@ -84,6 +87,13 @@ struct noise_handshake {
 
 	u8 latest_timestamp[NOISE_TIMESTAMP_LEN];
 	__le32 remote_index;
+
+	/* Scratch buffer for kdf() calls made while holding the handshake
+	 * write lock.  Avoids per-call kmalloc of the 832-byte Hmac struct.
+	 * Must not be used from consume_initiation or consume_response, which
+	 * perform kdf operations outside the write lock.
+	 */
+	struct Hmac kdf_hmac;
 
 	/* Protects all members except the immutable (after noise_handshake_
 	 * init): remote_static, precomputed_static_static, static_identity.

@@ -301,10 +301,9 @@ static bool decrypt_packet(struct sk_buff *skb, struct noise_keypair *keypair)
 	if (skb_to_sgvec(skb, sg, 0, skb->len) <= 0)
 		return false;
 
-	if (! wc_AesGcm_decrypt_sg_inplace(sg, skb->len, NULL, 0,
-					   PACKET_CB(skb)->nonce,
-					   keypair->receiving.key,
-					   sizeof(keypair->receiving.key)))
+	if (! wc_AesGcm_decrypt_sg_inplace_prealloc(sg, skb->len, NULL, 0,
+						    PACKET_CB(skb)->nonce,
+						    &keypair->aes_decrypt))
 		return false;
 
 	/* Another ugly situation of pushing and pulling the header so as to

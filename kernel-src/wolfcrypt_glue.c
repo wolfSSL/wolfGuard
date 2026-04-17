@@ -487,6 +487,267 @@ bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len,
                                                    ad, ad_len, nonce, key, key_len, 1));
 }
 
+#ifdef WOLFSSL_AESGCM_STREAM
+
+static __always_inline bool wc_AesGcm_crypt_sg_inplace_prealloc(
+                                       struct scatterlist *src, const size_t src_len,
+                                       const u8 *ad, const size_t ad_len,
+                                       u64 nonce,
+                                       Aes *aes,
+                                       int isDecrypt)
+{
+    int ret = -1;
+    struct sg_mapping_iter miter;
+    int miter_needs_stop = 0;
+    unsigned int flags;
+    ssize_t sl;
+    byte full_nonce[AES_IV_SIZE];
+
+    if (WARN_ON((src_len > UINT_MAX) ||
+                (ad_len > UINT_MAX)))
+    {
+        ret = -EINVAL;
+        WC_DEBUG_PR_CODEPOINT();
+        goto out;
+    }
+
+    memset(full_nonce, 0, sizeof(full_nonce));
+#ifdef BIG_ENDIAN_ORDER
+    nonce = cpu_to_le64(nonce);
+#endif
+    memcpy(full_nonce + 4, (u8 *)&nonce, sizeof(nonce));
+
+    /* Pass NULL key: wc_AesGcmInit skips wc_AesGcmSetKey when key is NULL,
+     * reusing the key schedule already set at keypair creation time.
+     */
+    if (isDecrypt)
+        ret = wc_AesGcmDecryptInit(aes, NULL, 0,
+                                   full_nonce, (word32)sizeof(full_nonce));
+    else
+        ret = wc_AesGcmEncryptInit(aes, NULL, 0,
+                                   full_nonce, (word32)sizeof(full_nonce));
+    wc_ForceZero(full_nonce, sizeof full_nonce);
+    if (ret != 0) {
+        WC_DEBUG_PR_CODEPOINT();
+        goto out;
+    }
+
+    if (ad) {
+        if (isDecrypt)
+            ret = wc_AesGcmDecryptUpdate(aes, NULL, NULL,
+                                         0, ad, ad_len);
+        else
+            ret = wc_AesGcmEncryptUpdate(aes, NULL, NULL,
+                                         0, ad, ad_len);
+        if (ret != 0) {
+            WC_DEBUG_PR_CODEPOINT();
+            goto out;
+        }
+    }
+
+    flags = SG_MITER_TO_SG | SG_MITER_ATOMIC;
+
+    sg_miter_start(&miter, src, sg_nents(src), flags);
+    miter_needs_stop = 1;
+
+    for (sl = (ssize_t)src_len; sl > 0 && sg_miter_next(&miter); sl -= miter.length) {
+        size_t length = min_t(size_t, sl, (ssize_t)miter.length);
+
+        if (isDecrypt)
+            ret = wc_AesGcmDecryptUpdate(aes, miter.addr, miter.addr,
+                                         length, NULL, 0);
+        else
+            ret = wc_AesGcmEncryptUpdate(aes, miter.addr, miter.addr,
+                                         length, NULL, 0);
+        if (ret != 0) {
+            WC_DEBUG_PR_CODEPOINT();
+            goto out;
+        }
+    }
+
+    if (sl <= -WC_AES_BLOCK_SIZE) {
+        if (isDecrypt)
+            ret = wc_AesGcmDecryptFinal(aes, miter.addr + (ssize_t)miter.length + sl, WC_AES_BLOCK_SIZE);
+        else
+            ret = wc_AesGcmEncryptFinal(aes, miter.addr + (ssize_t)miter.length + sl, WC_AES_BLOCK_SIZE);
+        if (ret < 0) {
+            WC_DEBUG_PR_CODEPOINT();
+            goto out;
+        }
+    }
+
+    sg_miter_stop(&miter);
+    miter_needs_stop = 0;
+
+    if (sl > -WC_AES_BLOCK_SIZE) {
+        byte AuthTagBuf[WC_AES_BLOCK_SIZE];
+
+        if (isDecrypt) {
+            scatterwalk_map_and_copy(AuthTagBuf, src, src_len,
+                                     sizeof AuthTagBuf, 0 /* isEncrypt */);
+            ret = wc_AesGcmDecryptFinal(aes, AuthTagBuf, WC_AES_BLOCK_SIZE);
+            if (ret < 0)
+                goto out;
+        } else {
+            ret = wc_AesGcmEncryptFinal(aes, AuthTagBuf, WC_AES_BLOCK_SIZE);
+            if (ret < 0)
+                goto out;
+            scatterwalk_map_and_copy(AuthTagBuf, src, src_len,
+                                     sizeof AuthTagBuf, 1 /* isEncrypt */);
+        }
+    }
+
+    ret = 0;
+
+  out:
+
+    if (miter_needs_stop)
+        sg_miter_stop(&miter);
+
+    WC_DEBUG_PR_IF_NEG(ret);
+
+    return ret == 0;
+}
+
+#else /* !WOLFSSL_AESGCM_STREAM */
+
+static __always_inline bool wc_AesGcm_crypt_sg_inplace_prealloc(
+                                       struct scatterlist *src, const size_t src_len,
+                                       const u8 *ad, const size_t ad_len,
+                                       u64 nonce,
+                                       Aes *aes,
+                                       int isDecrypt)
+{
+    int ret = -1;
+    struct sg_mapping_iter miter;
+    unsigned int flags;
+    byte full_nonce[AES_IV_SIZE];
+
+    if (WARN_ON((src_len > UINT_MAX) ||
+                (ad_len > UINT_MAX)))
+    {
+        ret = -EINVAL;
+        WC_DEBUG_PR_CODEPOINT();
+        goto out;
+    }
+
+    if (sg_nents(src) < 1) {
+        ret = -EINVAL;
+        WC_DEBUG_PR_CODEPOINT();
+        goto out;
+    }
+
+    memset(full_nonce, 0, sizeof(full_nonce));
+#ifdef BIG_ENDIAN_ORDER
+    nonce = cpu_to_le64(nonce);
+#endif
+    memcpy(full_nonce + 4, (u8 *)&nonce, sizeof(nonce));
+
+    flags = SG_MITER_TO_SG | SG_MITER_ATOMIC;
+
+    if (sg_nents(src) == 1) {
+        size_t length;
+
+        sg_miter_start(&miter, src, sg_nents(src), flags);
+        if ((sg_nents(src) == 1) && (! sg_miter_next(&miter))) {
+            sg_miter_stop(&miter);
+            ret = -EINVAL;
+            WC_DEBUG_PR_CODEPOINT();
+            goto out;
+        }
+
+        if (miter.length < src_len + WC_AES_BLOCK_SIZE) {
+            sg_miter_stop(&miter);
+            goto copy_after_all;
+        }
+
+        length = min_t(size_t, src_len, miter.length);
+
+        if (isDecrypt) {
+            ret = wc_AesGcmDecrypt(aes, miter.addr,
+                                   miter.addr, (word32)length,
+                                   full_nonce, (word32)sizeof(full_nonce),
+                                   miter.addr + length, WC_AES_BLOCK_SIZE,
+                                   ad, (word32)ad_len);
+        }
+        else {
+            ret = wc_AesGcmEncrypt(aes, miter.addr,
+                                   miter.addr, (word32)length,
+                                   full_nonce, (word32)sizeof(full_nonce),
+                                   miter.addr + length, WC_AES_BLOCK_SIZE,
+                                   ad, (word32)ad_len);
+        }
+
+        sg_miter_stop(&miter);
+
+        goto out;
+    }
+
+    copy_after_all:
+    {
+        byte *buf = (byte *)XMALLOC(src_len + WC_AES_BLOCK_SIZE, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+
+        if (! buf) {
+            ret = -ENOMEM;
+            WC_DEBUG_PR_CODEPOINT();
+            goto out;
+        }
+
+        if (isDecrypt) {
+            scatterwalk_map_and_copy(buf, src, 0, src_len + WC_AES_BLOCK_SIZE, 0);
+            ret = wc_AesGcmDecrypt(aes, buf,
+                                   buf, (word32)src_len,
+                                   full_nonce, (word32)sizeof(full_nonce),
+                                   buf + src_len, WC_AES_BLOCK_SIZE,
+                                   ad, (word32)ad_len);
+            if (ret == 0)
+                scatterwalk_map_and_copy(buf, src, 0, src_len, 1);
+            wc_ForceZero(buf, src_len + WC_AES_BLOCK_SIZE);
+        }
+        else {
+            scatterwalk_map_and_copy(buf, src, 0, src_len, 0);
+            ret = wc_AesGcmEncrypt(aes, buf,
+                                   buf, (word32)src_len,
+                                   full_nonce, (word32)sizeof(full_nonce),
+                                   buf + src_len, WC_AES_BLOCK_SIZE,
+                                   ad, (word32)ad_len);
+            if (ret == 0)
+                scatterwalk_map_and_copy(buf, src, 0, src_len + WC_AES_BLOCK_SIZE, 1);
+            else
+                wc_ForceZero(buf, src_len + WC_AES_BLOCK_SIZE);
+        }
+        free(buf);
+    }
+
+  out:
+
+    wc_ForceZero(full_nonce, sizeof full_nonce);
+
+    WC_DEBUG_PR_IF_NEG(ret);
+
+    return ret == 0;
+}
+
+#endif /* !WOLFSSL_AESGCM_STREAM */
+
+bool wc_AesGcm_encrypt_sg_inplace_prealloc(struct scatterlist *src, size_t src_len,
+                                           const u8 *ad, const size_t ad_len,
+                                           const u64 nonce,
+                                           Aes *aes)
+{
+    WC_DEBUG_PR_FALSE_RET(wc_AesGcm_crypt_sg_inplace_prealloc(src, src_len, ad, ad_len,
+                                                              nonce, aes, 0));
+}
+
+bool wc_AesGcm_decrypt_sg_inplace_prealloc(struct scatterlist *src, size_t src_len,
+                                           const u8 *ad, const size_t ad_len,
+                                           const u64 nonce,
+                                           Aes *aes)
+{
+    WC_DEBUG_PR_FALSE_RET(wc_AesGcm_crypt_sg_inplace_prealloc(src, src_len - WC_AES_BLOCK_SIZE,
+                                                              ad, ad_len, nonce, aes, 1));
+}
+
 int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,
                              const int curve_id, int compressed)

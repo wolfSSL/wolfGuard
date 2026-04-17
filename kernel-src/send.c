@@ -264,9 +264,9 @@ static bool encrypt_packet(struct sk_buff *skb, struct noise_keypair *keypair)
 	if (skb_to_sgvec(skb, sg, sizeof(struct message_data),
 			 noise_encrypted_len(plaintext_len)) <= 0)
 		return false;
-	return wc_AesGcm_encrypt_sg_inplace(sg, plaintext_len, NULL, 0,
-					    PACKET_CB(skb)->nonce,
-					    keypair->sending.key, sizeof(keypair->sending.key));
+	return wc_AesGcm_encrypt_sg_inplace_prealloc(sg, plaintext_len, NULL, 0,
+						     PACKET_CB(skb)->nonce,
+						     &keypair->aes_encrypt);
 }
 
 void wg_packet_send_keepalive(struct wg_peer *peer)

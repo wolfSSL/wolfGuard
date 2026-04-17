@@ -215,6 +215,16 @@ extern bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len
                                          const u8 *key,
                                          const size_t key_len);
 
+extern bool wc_AesGcm_encrypt_sg_inplace_prealloc(struct scatterlist *src, size_t src_len,
+                                                   const u8 *ad, const size_t ad_len,
+                                                   const u64 nonce,
+                                                   Aes *aes);
+
+extern bool wc_AesGcm_decrypt_sg_inplace_prealloc(struct scatterlist *src, size_t src_len,
+                                                   const u8 *ad, const size_t ad_len,
+                                                   const u64 nonce,
+                                                   Aes *aes);
+
 #ifdef WC_DRBG_BANKREF
 
 extern struct wc_rng_bank *wc_wg_drbg;

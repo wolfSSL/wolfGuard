@@ -258,8 +258,10 @@ void wg_ratelimiter_uninit(void)
 	rcu_barrier();
 	memzero_explicit(key, sizeof key);
 	kvfree(table_v4);
+	table_v4 = NULL;
 #if IS_ENABLED(CONFIG_IPV6)
 	kvfree(table_v6);
+	table_v6 = NULL;
 #endif
 	kmem_cache_destroy(entry_cache);
 out:

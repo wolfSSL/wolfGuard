@@ -471,12 +471,15 @@ err_free_incoming_handshakes:
 err_free_tstats:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
+	dev->tstats = NULL;
 err_free_index_hashtable:
 #endif
 	kvfree(wg->index_hashtable);
+	wg->index_hashtable = NULL;
 err_free_peer_hashtable:
-        memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
+	memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
+	wg->peer_hashtable = NULL;
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 

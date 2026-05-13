@@ -276,6 +276,7 @@ static void wg_destruct(struct net_device *dev)
 	rcu_barrier(); /* Wait for all the peers to be actually freed. */
 	wg_ratelimiter_uninit();
 	memzero_explicit(&wg->static_identity, sizeof(wg->static_identity));
+	memzero_explicit(&wg->cookie_checker.secret, sizeof(wg->cookie_checker.secret));
 	skb_queue_purge(&wg->incoming_handshakes);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 9, 0)
 	free_percpu(dev->tstats);
@@ -477,6 +478,7 @@ err_free_index_hashtable:
 	kvfree(wg->index_hashtable);
 	wg->index_hashtable = NULL;
 err_free_peer_hashtable:
+	memzero_explicit(&wg->cookie_checker.secret, sizeof(wg->cookie_checker.secret));
 	memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	wg->peer_hashtable = NULL;

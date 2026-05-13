@@ -88,7 +88,10 @@ err_3:
 err_2:
 	dst_cache_destroy(&peer->endpoint_cache);
 err_1:
-	kfree(peer);
+	/* use kfree_sensitive() to clean up peer->handshake.preshared_key and
+	 * peer->handshake.precomputed_static_static.
+	 */
+	kfree_sensitive(peer);
 	return ERR_PTR(ret);
 }
 

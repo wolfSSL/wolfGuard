@@ -327,13 +327,18 @@ void wg_noise_set_static_identity_private_key(
 	struct noise_static_identity *static_identity,
 	const u8 private_key[NOISE_PRIVATE_KEY_LEN])
 {
-	memcpy(static_identity->static_private, private_key,
-	       NOISE_PRIVATE_KEY_LEN);
-
-	static_identity->has_identity = wc_ecc_private_to_public_exim(
-		static_identity->static_private, sizeof(static_identity->static_private),
-		static_identity->static_public, sizeof(static_identity->static_public),
-		NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED) == 0;
+	if (wc_ecc_private_to_public_exim(private_key, NOISE_PRIVATE_KEY_LEN,
+					  static_identity->static_public,
+					  sizeof(static_identity->static_public),
+					  NOISE_CURVE_ID, WG_PUBLIC_KEY_COMPRESSED)
+	    == 0)
+	{
+		memcpy(static_identity->static_private, private_key,
+		       NOISE_PRIVATE_KEY_LEN);
+		static_identity->has_identity = 1;
+	}
+	else
+		static_identity->has_identity = 0;
 }
 
 /* This is Hugo Krawczyk's HKDF:

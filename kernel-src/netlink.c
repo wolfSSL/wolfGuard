@@ -559,7 +559,8 @@ static int wg_set_device(struct sk_buff *skb, struct genl_info *info)
 		u8 public_key[NOISE_PUBLIC_KEY_LEN];
 		struct wg_peer *peer, *temp;
 
-		if (!ConstantCompare(wg->static_identity.static_private,
+		if (wg->static_identity.has_identity &&
+		    !ConstantCompare(wg->static_identity.static_private,
 				     private_key, NOISE_PRIVATE_KEY_LEN))
 			goto skip_set_private_key;
 

@@ -63,11 +63,13 @@ int pubkey_main(int argc, char *argv[])
 	pubkey_base64 = (char *)malloc(pubkey_base64_len);
 	if (! pubkey_base64) {
 		fprintf(stderr, "malloc: %m\n");
+		ret = -ENOMEM;
 		goto out;
 	}
 
 	if (!wg_to_base64(pubkey_base64, pubkey_base64_len, pubkey, pubkey_len)) {
 		fprintf(stderr, "wg_to_base64() failed.\n");
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -121,6 +123,7 @@ int pubkey_main(int argc, char *argv[])
 
 	if (fread(base64, 1, WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1, stdin) != WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1) {
 		errno = EINVAL;
+		ret = -EINVAL;
 		fprintf(stderr, "%s: Key is not the correct length or format\n", PROG_NAME);
 		goto out;
 	}
@@ -133,11 +136,13 @@ int pubkey_main(int argc, char *argv[])
 		if (trailing_char == EOF)
 			break;
 		fprintf(stderr, "%s: Trailing characters found after key\n", PROG_NAME);
+		ret = -EINVAL;
 		goto out;
 	}
 
 	if (!wg_from_base64(key, WG_PRIVATE_KEY_LEN, base64, WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) - 1)) {
 		fprintf(stderr, "%s: wg_from_base64(): Key is not the correct length or format\n", PROG_NAME);
+		ret = -EINVAL;
 		goto out;
 	}
 

@@ -541,8 +541,14 @@ bool config_read_line(struct config_ctx *ctx, const char *input)
 	}
 
 	for (size_t i = 0; i < len; ++i) {
-		if (!char_is_space(input[i]))
+		/* Keep only printable non-space ASCII -- discard control
+		 * characters, UTF-8, etc.
+		 */
+		if (((unsigned char)input[i] > ' ') &&
+		    ((unsigned char)input[i] < 0x7f))
+		{
 			line[cleaned_len++] = input[i];
+		}
 	}
 	if (!cleaned_len)
 		goto out;

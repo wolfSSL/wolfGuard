@@ -26,6 +26,7 @@
 #include <linux/if_arp.h>
 #include <linux/icmp.h>
 #include <linux/suspend.h>
+#include <linux/ctype.h>
 #include <net/icmp.h>
 #include <net/rtnetlink.h>
 #include <net/ip_tunnels.h>
@@ -341,6 +342,23 @@ static void wg_setup(struct net_device *dev)
 	wg->dev = dev;
 }
 
+static bool wg_link_dev_name_valid(const struct net_device *dev)
+{
+	const unsigned char *n;
+
+	/* Allow only printable ASCII characters in device names -- other
+	 * characters can confuse log rendering, particularly when ANSI
+	 * sequences are interpreted.
+	 *
+	 * Note that net admins can rename devices after initialization,
+	 * bypassing this test.
+	 */
+	for (n = (const unsigned char *)dev->name; *n; ++n)
+		if (!isprint(*n))
+			return false;
+	return true;
+}
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 static int wg_newlink(struct net_device *dev,
 		      struct rtnl_newlink_params *params,
@@ -358,6 +376,9 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	int ret;
 
 	(void)extack;
+
+	if (!wg_link_dev_name_valid(dev))
+		WC_DEBUG_PR_NEG_RET(-EINVAL);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
 	rcu_assign_pointer(wg->creating_net, link_net);

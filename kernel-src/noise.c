@@ -721,20 +721,26 @@ wg_noise_handshake_consume_initiation(struct message_handshake_initiation *src,
 		goto out;
 	}
 
-	down_read(&handshake->lock);
+        /* Get an exclusive lock here, even though initially we only need a read
+	 * lock -- this avoids a race window after the defensive tests and
+	 * before storing the new ephemeral key.  The attack tests have a
+	 * negligible CPU footprint, so the atomic ops (identically expensive
+	 * for exclusive and shared) dominate here, militating for a single
+	 * semaphore cycle with exclusive semantics.
+	 */
+	down_write(&handshake->lock);
 	replay_attack = memcmp(t, handshake->latest_timestamp,
 			       NOISE_TIMESTAMP_LEN) <= 0;
 	flood_attack = (s64)handshake->last_initiation_consumption +
 			       NSEC_PER_SEC / INITIATIONS_PER_SECOND >
 		       (s64)ktime_get_coarse_boottime_ns();
-	up_read(&handshake->lock);
 	if (replay_attack || flood_attack) {
+		up_write(&handshake->lock);
 		WC_DEBUG_PR_CODEPOINT();
 		goto out;
 	}
 
 	/* Success! Copy everything to peer */
-	down_write(&handshake->lock);
 	memcpy(handshake->remote_ephemeral, e, NOISE_PUBLIC_KEY_LEN);
 	if (memcmp(t, handshake->latest_timestamp, NOISE_TIMESTAMP_LEN) > 0)
 		memcpy(handshake->latest_timestamp, t, NOISE_TIMESTAMP_LEN);

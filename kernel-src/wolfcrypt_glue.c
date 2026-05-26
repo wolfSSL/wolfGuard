@@ -763,8 +763,10 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
         PRIVATE_KEY_UNLOCK();
         ret = wc_ecc_shared_secret(privKey, pubKey, secret, &secret_len_copy);
         PRIVATE_KEY_LOCK();
-        if ((ret == 0) && (secret_len_copy != (word32)secret_len))
+        if ((ret == 0) && (secret_len_copy != (word32)secret_len)) {
             ret = WC_KEY_SIZE_E;
+            wc_ForceZero(secret, secret_len);
+        }
     }
 
 out:

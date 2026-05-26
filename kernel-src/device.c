@@ -373,7 +373,7 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 	wg_allowedips_init(&wg->peer_allowedips);
 	ret = wg_cookie_checker_init(&wg->cookie_checker, wg);
 	if (ret)
-		WC_DEBUG_PR_NEG_RET(ret);
+		goto err_zero_cookie_checker_secret;
 
 	ret = -ENOMEM;
 
@@ -382,7 +382,7 @@ static int wg_newlink(struct net *src_net, struct net_device *dev,
 
 	wg->peer_hashtable = wg_pubkey_hashtable_alloc();
 	if (!wg->peer_hashtable)
-		WC_DEBUG_PR_NEG_RET(ret);
+		goto err_zero_cookie_checker_secret;
 
 	wg->index_hashtable = wg_index_hashtable_alloc();
 	if (!wg->index_hashtable)
@@ -478,10 +478,11 @@ err_free_index_hashtable:
 	kvfree(wg->index_hashtable);
 	wg->index_hashtable = NULL;
 err_free_peer_hashtable:
-	memzero_explicit(&wg->cookie_checker.secret, sizeof(wg->cookie_checker.secret));
 	memzero_explicit(wg->peer_hashtable->key, sizeof wg->peer_hashtable->key);
 	kvfree(wg->peer_hashtable);
 	wg->peer_hashtable = NULL;
+err_zero_cookie_checker_secret:
+	memzero_explicit(&wg->cookie_checker.secret, sizeof(wg->cookie_checker.secret));
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 

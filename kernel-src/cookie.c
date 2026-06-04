@@ -103,52 +103,49 @@ static int __must_check compute_mac2(u8 mac2[COOKIE_LEN], const void *message, s
 static int __must_check make_cookie(u8 cookie[COOKIE_LEN], struct sk_buff *skb,
 			struct cookie_checker *checker)
 {
-	int ret;
-	struct Hmac *wc_hmac; /* sizeof(struct Hmac) is 832 if SHA3 is enabled. */
+	int ret = 0;
 
-	wc_hmac = (struct Hmac *)malloc(sizeof(*wc_hmac));
-	if (! wc_hmac)
-		return -ENOMEM;
+	/* Take write lock for the entire operation to ensure exclusive access
+	 * to checker->make_cookie_hmac.  make_cookie is only invoked under
+	 * rate-limiting conditions, so serialising on the write lock is fine.
+	 */
+	down_write(&checker->secret_lock);
 
-	ret = wc_HmacInit(wc_hmac, NULL /* heap */, INVALID_DEVID);
-	if (ret < 0)
-		goto out_hmac_uninited;
-
-	if ((ret == 0) && wg_birthdate_has_expired(checker->secret_birthdate,
+	if (wg_birthdate_has_expired(checker->secret_birthdate,
 				     COOKIE_SECRET_MAX_AGE)) {
-		down_write(&checker->secret_lock);
 		ret = wc_get_random_bytes(checker->secret, NOISE_HASH_LEN);
 		if (ret == 0)
 			checker->secret_birthdate = ktime_get_coarse_boottime_ns();
-		up_write(&checker->secret_lock);
 	}
+
+	if (ret == 0)
+		ret = wc_HmacInit(&checker->make_cookie_hmac, NULL /* heap */, INVALID_DEVID);
 
 	if (ret == 0) {
-		down_read(&checker->secret_lock);
-
-		ret = wc_HmacSetKey(wc_hmac, WC_SHA256, checker->secret, NOISE_HASH_LEN);
+		ret = wc_HmacSetKey(&checker->make_cookie_hmac, WC_SHA256,
+				    checker->secret, NOISE_HASH_LEN);
 
 		if ((ret == 0) && (skb->protocol == htons(ETH_P_IP)))
-			ret = wc_HmacUpdate(wc_hmac, (u8 *)&ip_hdr(skb)->saddr,
+			ret = wc_HmacUpdate(&checker->make_cookie_hmac,
+					    (u8 *)&ip_hdr(skb)->saddr,
 					    (word32)sizeof(struct in_addr));
 		else if ((ret == 0) && (skb->protocol == htons(ETH_P_IPV6)))
-			ret = wc_HmacUpdate(wc_hmac, (u8 *)&ipv6_hdr(skb)->saddr,
+			ret = wc_HmacUpdate(&checker->make_cookie_hmac,
+					    (u8 *)&ipv6_hdr(skb)->saddr,
 					    (word32)sizeof(struct in6_addr));
-	
-		if (ret == 0)
-			ret = wc_HmacUpdate(wc_hmac, (u8 *)&udp_hdr(skb)->source, sizeof(__be16));
 
 		if (ret == 0)
-			ret = wc_HmacFinal(wc_hmac, cookie);
+			ret = wc_HmacUpdate(&checker->make_cookie_hmac,
+					    (u8 *)&udp_hdr(skb)->source,
+					    sizeof(__be16));
 
-		up_read(&checker->secret_lock);
+		if (ret == 0)
+			ret = wc_HmacFinal(&checker->make_cookie_hmac, cookie);
+
+		wc_HmacFree(&checker->make_cookie_hmac);
 	}
 
-	wc_HmacFree(wc_hmac);
-
-out_hmac_uninited:
-
-	free(wc_hmac);
+	up_write(&checker->secret_lock);
 
 	return ret;
 }

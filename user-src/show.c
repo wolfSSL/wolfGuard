@@ -256,9 +256,11 @@ static void pretty_print(struct wgdevice *device)
 	static char base64_buf[WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) > WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN) ?
 			       WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) :
 			       WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN)];
+	char name[IFNAMSIZ];
 
+	terminal_sanitize(device->name, name, sizeof name);
 	terminal_printf(TERMINAL_RESET);
-	terminal_printf(TERMINAL_FG_GREEN TERMINAL_BOLD "interface" TERMINAL_RESET ": " TERMINAL_FG_GREEN "%s" TERMINAL_RESET "\n", device->name);
+	terminal_printf(TERMINAL_FG_GREEN TERMINAL_BOLD "interface" TERMINAL_RESET ": " TERMINAL_FG_GREEN "%s" TERMINAL_RESET "\n", name);
 	if (device->flags & WGDEVICE_HAS_PUBLIC_KEY)
 		terminal_printf("  " TERMINAL_BOLD "public key" TERMINAL_RESET ": %s\n", public_key(device->public_key));
 	if (device->flags & WGDEVICE_HAS_PRIVATE_KEY)
@@ -305,9 +307,11 @@ static void dump_print(struct wgdevice *device, bool with_interface)
 	static char base64_buf[WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) > WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN) ?
 			       WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) :
 			       WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN)];
+	char name[IFNAMSIZ];
 
+	terminal_sanitize(device->name, name, sizeof name);
 	if (with_interface)
-		printf("%s\t", device->name);
+		printf("%s\t", name);
 	printf("%s\t", maybe_private_key(device->private_key, base64_buf, device->flags & WGDEVICE_HAS_PRIVATE_KEY));
 	printf("%s\t", maybe_public_key(device->public_key, device->flags & WGDEVICE_HAS_PUBLIC_KEY));
 	printf("%u\t", device->listen_port);
@@ -317,7 +321,7 @@ static void dump_print(struct wgdevice *device, bool with_interface)
 		printf("off\n");
 	for_each_wgpeer(device, peer) {
 		if (with_interface)
-			printf("%s\t", device->name);
+			printf("%s\t", name);
 		printf("%s\t", public_key(peer->public_key));
 		printf("%s\t", maybe_preshared_key(peer->preshared_key, base64_buf, peer->flags & WGPEER_HAS_PRESHARED_KEY));
 		if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
@@ -346,23 +350,25 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	static char base64_buf[WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) > WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN) ?
 			       WG_BASE64_LEN(WG_PRIVATE_KEY_LEN) :
 			       WG_BASE64_LEN(WG_SYMMETRIC_KEY_LEN)];
+	char name[IFNAMSIZ];
 
+	terminal_sanitize(device->name, name, sizeof name);
 	if (!strcmp(param, "public-key")) {
 		if (with_interface)
-			printf("%s\t", device->name);
+			printf("%s\t", name);
 		printf("%s\n", maybe_public_key(device->public_key, device->flags & WGDEVICE_HAS_PUBLIC_KEY));
 	} else if (!strcmp(param, "private-key")) {
 		if (with_interface)
-			printf("%s\t", device->name);
+			printf("%s\t", name);
 		printf("%s\n", maybe_private_key(device->private_key, base64_buf, device->flags & WGDEVICE_HAS_PRIVATE_KEY));
 		memzero_explicit(base64_buf, sizeof base64_buf);
 	} else if (!strcmp(param, "listen-port")) {
 		if (with_interface)
-			printf("%s\t", device->name);
+			printf("%s\t", name);
 		printf("%u\n", device->listen_port);
 	} else if (!strcmp(param, "fwmark")) {
 		if (with_interface)
-			printf("%s\t", device->name);
+			printf("%s\t", name);
 		if (device->fwmark)
 			printf("0x%x\n", device->fwmark);
 		else
@@ -370,7 +376,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "endpoints")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\t", public_key(peer->public_key));
 			if (peer->endpoint.addr.sa_family == AF_INET || peer->endpoint.addr.sa_family == AF_INET6)
 				printf("%s\n", endpoint(&peer->endpoint.addr));
@@ -380,7 +386,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "allowed-ips")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\t", public_key(peer->public_key));
 			if (peer->first_allowedip) {
 				for_each_wgallowedip(peer, allowedip)
@@ -391,19 +397,19 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "latest-handshakes")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\t%llu\n", public_key(peer->public_key), (unsigned long long)peer->last_handshake_time.tv_sec);
 		}
 	} else if (!strcmp(param, "transfer")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\t%" PRIu64 "\t%" PRIu64 "\n", public_key(peer->public_key), (uint64_t)peer->rx_bytes, (uint64_t)peer->tx_bytes);
 		}
 	} else if (!strcmp(param, "persistent-keepalive")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			if (peer->persistent_keepalive_interval)
 				printf("%s\t%u\n", public_key(peer->public_key), peer->persistent_keepalive_interval);
 			else
@@ -412,7 +418,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "preshared-keys")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\t", public_key(peer->public_key));
 			printf("%s\n", maybe_preshared_key(peer->preshared_key, base64_buf, peer->flags & WGPEER_HAS_PRESHARED_KEY));
 		}
@@ -420,7 +426,7 @@ static bool ugly_print(struct wgdevice *device, const char *param, bool with_int
 	} else if (!strcmp(param, "peers")) {
 		for_each_wgpeer(device, peer) {
 			if (with_interface)
-				printf("%s\t", device->name);
+				printf("%s\t", name);
 			printf("%s\n", public_key(peer->public_key));
 		}
 	} else if (!strcmp(param, "dump"))
@@ -446,6 +452,7 @@ int show_main(int argc, char *argv[])
 
 	if (argc == 1 || !strcmp(argv[1], "all")) {
 		char *interfaces = ipc_list_devices(), *interface;
+		char name[IFNAMSIZ];
 
 		if (!interfaces) {
 			perror("Unable to list interfaces");
@@ -457,7 +464,8 @@ int show_main(int argc, char *argv[])
 			struct wgdevice *device = NULL;
 
 			if (ipc_get_device(&device, interface) < 0) {
-				fprintf(stderr, "Unable to access interface %s: %s\n", interface, strerror(errno));
+				terminal_sanitize(interface, name, sizeof name);
+				fprintf(stderr, "Unable to access interface %s: %s\n", name, strerror(errno));
 				continue;
 			}
 			if (argc == 3) {
@@ -477,6 +485,7 @@ int show_main(int argc, char *argv[])
 		free(interfaces);
 	} else if (!strcmp(argv[1], "interfaces")) {
 		char *interfaces, *interface;
+		char name[IFNAMSIZ];
 
 		if (argc > 2) {
 			show_usage();
@@ -488,8 +497,10 @@ int show_main(int argc, char *argv[])
 			return 1;
 		}
 		interface = interfaces;
-		for (size_t len = 0; (len = strlen(interface)); interface += len + 1)
-			printf("%s%c", interface, strlen(interface + len + 1) ? ' ' : '\n');
+		for (size_t len = 0; (len = strlen(interface)); interface += len + 1) {
+			terminal_sanitize(interface, name, sizeof name);
+			printf("%s%c", name, strlen(interface + len + 1) ? ' ' : '\n');
+		}
 		free(interfaces);
 	} else if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help") || !strcmp(argv[1], "help")))
 		show_usage();

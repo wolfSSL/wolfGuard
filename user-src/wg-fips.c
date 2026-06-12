@@ -11,6 +11,7 @@
 
 #include "subcommands.h"
 #include "version.h"
+#include "terminal.h"
 #include "ipc.h" /* for IPC_SUPPORTS_KERNEL_INTERFACE */
 
 #if !defined(IPC_SUPPORTS_KERNEL_INTERFACE) || defined(NO_IPC_LLCRYPTO)
@@ -47,7 +48,11 @@ static void show_usage(FILE *file)
 
 int main(int argc, char *argv[])
 {
-	PROG_NAME = argv[0];
+	static char prog_name[4096];
+	char safe[256];
+
+	terminal_sanitize(argv[0], prog_name, sizeof prog_name);
+	PROG_NAME = prog_name;
 
 	if (argc == 2 && (!strcmp(argv[1], "-v") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "version"))) {
 		printf("wolfguard-tools v%s - info@wolfssl.com\n", WOLFGUARD_TOOLS_VERSION);
@@ -74,7 +79,8 @@ int main(int argc, char *argv[])
 			return subcommands[i].function(argc - 1, argv + 1);
 	}
 
-	fprintf(stderr, "Invalid subcommand: `%s'\n", argv[1]);
+	terminal_sanitize(argv[1], safe, sizeof safe);
+	fprintf(stderr, "Invalid subcommand: `%s'\n", safe);
 	show_usage(stderr);
 	return 1;
 }

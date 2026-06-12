@@ -880,17 +880,17 @@ struct genl_ops genl_ops[] = {
 		.cmd = WG_CMD_GEN_PRIVKEY,
 		.doit = wg_nl_generate_privkey,
 		.policy = device_policy,
-		.flags = GENL_UNS_ADMIN_PERM
+		.flags = GENL_ADMIN_PERM
 	}, {
 		.cmd = WG_CMD_DERIVE_PUBKEY,
 		.doit = wg_nl_derive_pubkey,
 		.policy = device_policy,
-		.flags = GENL_UNS_ADMIN_PERM
+		.flags = GENL_ADMIN_PERM
 	}, {
 		.cmd = WG_CMD_GEN_PSK,
 		.doit = wg_nl_generate_psk,
 		.policy = device_policy,
-		.flags = GENL_UNS_ADMIN_PERM
+		.flags = GENL_ADMIN_PERM
 	}
 };
 

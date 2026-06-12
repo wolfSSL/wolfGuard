@@ -197,6 +197,7 @@ static inline int __maybe_unused __compat_udp_sock_create(struct net *net, struc
 
 #if IS_ENABLED(CONFIG_IPV6)
 	if (cfg->family == AF_INET6) {
+		static DEFINE_MUTEX(bindv6only_lock);
 		int ret;
 		int old_bindv6only;
 		struct net *nobns;
@@ -209,13 +210,17 @@ static inline int __maybe_unused __compat_udp_sock_create(struct net *net, struc
 #endif
 			/* Since udp_port_cfg only learned of ipv6_v6only in 4.3, we do this horrible
 			 * hack here and set the sysctl variable temporarily to something that will
-			 * set the right option for us in sock_create. It's super racey! */
+			 * set the right option for us in sock_create. It's super racey, so serialize
+			 * the save/restore so concurrent creates can't leak the toggled value. */
+			mutex_lock(&bindv6only_lock);
 			old_bindv6only = nobns->ipv6.sysctl.bindv6only;
 			nobns->ipv6.sysctl.bindv6only = 1;
 		}
 		ret = udp_sock_create6(net, &old_cfg, sockp);
-		if (cfg->ipv6_v6only)
+		if (cfg->ipv6_v6only) {
 			nobns->ipv6.sysctl.bindv6only = old_bindv6only;
+			mutex_unlock(&bindv6only_lock);
+		}
 		return ret;
 	}
 #endif

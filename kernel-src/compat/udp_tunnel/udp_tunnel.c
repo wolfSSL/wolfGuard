@@ -24,10 +24,14 @@ static void __compat_sk_data_ready(struct sock *sk
 			      )
 {
 	struct sk_buff *skb;
+	udp_tunnel_encap_rcv_t rcv;
+
+	smp_rmb(); /* pairs with smp_wmb() in setup_udp_tunnel_sock() */
+	rcv = READ_ONCE(encap_rcv);
 	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		skb_orphan(skb);
 		sk_mem_reclaim(sk);
-		encap_rcv(sk, skb);
+		rcv(sk, skb);
 	}
 }
 
@@ -82,8 +86,9 @@ void setup_udp_tunnel_sock(struct net *net, struct socket *sock,
 			   struct udp_tunnel_sock_cfg *cfg)
 {
 	inet_sk(sock->sk)->mc_loop = 0;
-	encap_rcv = cfg->encap_rcv;
+	WRITE_ONCE(encap_rcv, cfg->encap_rcv);
 	rcu_assign_sk_user_data(sock->sk, cfg->sk_user_data);
+	smp_wmb(); /* publish encap_rcv before sk_data_ready */
 	/* We force the cast in this awful way, due to various Android kernels
 	 * backporting things stupidly. */
 	*(void **)&sock->sk->sk_data_ready = (void *)__compat_sk_data_ready;

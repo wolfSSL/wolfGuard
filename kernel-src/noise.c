@@ -219,11 +219,11 @@ void wg_noise_expire_current_peer_keypairs(struct wg_peer *peer)
 	keypair = rcu_dereference_protected(peer->keypairs.next_keypair,
 			lockdep_is_held(&peer->keypairs.keypair_update_lock));
 	if (keypair)
-		keypair->sending.is_valid = false;
+		WRITE_ONCE(keypair->sending.is_valid, false);
 	keypair = rcu_dereference_protected(peer->keypairs.current_keypair,
 			lockdep_is_held(&peer->keypairs.keypair_update_lock));
 	if (keypair)
-		keypair->sending.is_valid = false;
+		WRITE_ONCE(keypair->sending.is_valid, false);
 	spin_unlock_bh(&peer->keypairs.keypair_update_lock);
 }
 
@@ -895,7 +895,9 @@ wg_noise_handshake_consume_response(struct message_handshake_response *src,
 	/* It's important to check that the state is still the same, while we
 	 * have an exclusive lock.
 	 */
-	if (handshake->state != state) {
+	if (handshake->state != state ||
+	    ConstantCompare(handshake->ephemeral_private, ephemeral_private,
+			    NOISE_PRIVATE_KEY_LEN)) {
 		up_write(&handshake->lock);
 		goto fail;
 	}

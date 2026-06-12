@@ -686,6 +686,7 @@ out:
 	}
 
 	if (reply) {
+		memzero_explicit(reply->data, reply->len);
 		if (hdr)
 			genlmsg_cancel(reply, hdr);
 		nlmsg_free(reply);
@@ -836,6 +837,7 @@ out:
 	}
 
 	if (reply) {
+		memzero_explicit(reply->data, reply->len);
 		if (hdr)
 			genlmsg_cancel(reply, hdr);
 		nlmsg_free(reply);

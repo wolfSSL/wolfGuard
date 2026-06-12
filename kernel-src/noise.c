@@ -654,6 +654,9 @@ wg_noise_handshake_create_initiation(struct message_handshake_initiation *dst,
 
 out:
 
+	if (!ret)
+		memzero_explicit(handshake->ephemeral_private,
+				 sizeof(handshake->ephemeral_private));
 	up_write(&handshake->lock);
 	up_read(&handshake->static_identity->lock);
 	memzero_explicit(key, NOISE_SYMMETRIC_KEY_LEN);
@@ -819,6 +822,9 @@ bool wg_noise_handshake_create_response(struct message_handshake_response *dst,
 	ret = true;
 
 out:
+	if (!ret)
+		memzero_explicit(handshake->ephemeral_private,
+				 sizeof(handshake->ephemeral_private));
 	up_write(&handshake->lock);
 	up_read(&handshake->static_identity->lock);
 	memzero_explicit(key, NOISE_SYMMETRIC_KEY_LEN);

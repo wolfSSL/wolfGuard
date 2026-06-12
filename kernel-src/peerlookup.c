@@ -223,9 +223,11 @@ wg_index_hashtable_lookup(struct index_hashtable *table,
 		}
 	}
 	if (likely(entry)) {
-		entry->peer = wg_peer_get_maybe_zero(entry->peer);
-		if (likely(entry->peer))
-			*peer = entry->peer;
+		struct wg_peer *entry_peer;
+
+		entry_peer = wg_peer_get_maybe_zero(entry->peer);
+		if (likely(entry_peer))
+			*peer = entry_peer;
 		else
 			entry = NULL;
 	}

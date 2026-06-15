@@ -82,4 +82,5 @@ jobs:
         run: |
           make -C kernel-src -j"$(nproc)" \
             KERNELDIR="/lib/modules/$(uname -r)/build" \
-            WOLFSSL_ROOT="$WOLFSSL_ROOT"
+            WOLFSSL_ROOT="$WOLFSSL_ROOT" \
+            WOLFSSL_INCLUDE="$WOLFSSL_ROOT"

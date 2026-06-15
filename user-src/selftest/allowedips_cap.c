@@ -25,6 +25,12 @@ static int model_add(int new_prefix, int split)
 		return -1;
 	++node_count;
 	if (split) {
+		/* the intermediate split node is cap-checked too, so the cap is
+		 * strict; on rejection the newnode count is unwound. */
+		if (node_count >= MAX_NODES) {
+			--node_count;
+			return -1;
+		}
 		++node_count;
 	}
 	return 0;
@@ -57,13 +63,20 @@ int main(void)
 	assert(model_add(1, 0) == 0);
 	assert(node_count == MAX_NODES);
 
-	/* a rejected split never leaves a half-counted node */
+	/* a split with room for both nodes succeeds and never half-counts */
 	model_free_one();
 	model_free_one();
 	assert(node_count == MAX_NODES - 2);
 	assert(model_add(1, 1) == 0);
 	assert(node_count == MAX_NODES);
 
-	printf("allowedips cap: count tracked, cap enforced, no underflow\n");
+	/* at the cap boundary a splitting insert is rejected rather than
+	 * exceeding the cap by one */
+	model_free_one();
+	assert(node_count == MAX_NODES - 1);
+	assert(model_add(1, 1) == -1);
+	assert(node_count == MAX_NODES - 1);
+
+	printf("allowedips cap: count tracked, strict cap on split, no underflow\n");
 	return 0;
 }

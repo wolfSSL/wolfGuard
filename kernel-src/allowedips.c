@@ -287,7 +287,10 @@ static int add(struct allowedips *table, struct allowedips_node __rcu **trie,
 			rcu_assign_pointer(CHOOSE_NODE(parent, newnode->bits),
 					   newnode);
 	} else {
-		node = kzalloc(sizeof(*node), GFP_KERNEL_ACCOUNT);
+		if (table->node_count >= MAX_ALLOWEDIPS_PER_DEVICE)
+			node = NULL;
+		else
+			node = kzalloc(sizeof(*node), GFP_KERNEL_ACCOUNT);
 		if (unlikely(!node)) {
 			list_del(&newnode->peer_list);
 			kfree(newnode);

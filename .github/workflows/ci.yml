@@ -59,6 +59,8 @@ jobs:
     name: Kernel module build (best effort)
     runs-on: ubuntu-latest
     continue-on-error: true
+    env:
+      WOLFSSL_ROOT: ${{ github.workspace }}/wolfssl-km
     steps:
       - uses: actions/checkout@v4
       - name: Install kernel build dependencies
@@ -69,13 +71,15 @@ jobs:
       - name: Build libwolfssl kernel module
         run: |
           git clone --depth 1 --branch master \
-            https://github.com/wolfSSL/wolfssl.git "$HOME/wolfssl-km"
-          cd "$HOME/wolfssl-km"
+            https://github.com/wolfSSL/wolfssl.git "$WOLFSSL_ROOT"
+          cd "$WOLFSSL_ROOT"
           ./autogen.sh
           ./configure --quiet --enable-wolfguard --enable-cryptonly --enable-linuxkm \
-            --with-linux-source="/lib/modules/$(uname -r)/build"
+            --with-linux-source="/lib/modules/$(uname -r)/build" \
+            --prefix="$WOLFSSL_ROOT/linuxkm/build"
           make -j"$(nproc)" module
       - name: Build wolfguard.ko
         run: |
           make -C kernel-src -j"$(nproc)" \
-            KERNELDIR="/lib/modules/$(uname -r)/build"
+            KERNELDIR="/lib/modules/$(uname -r)/build" \
+            WOLFSSL_ROOT="$WOLFSSL_ROOT"

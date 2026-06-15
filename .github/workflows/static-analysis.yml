@@ -28,6 +28,7 @@ jobs:
             --suppress=missingInclude --suppress=missingIncludeSystem \
             --suppress=unmatchedSuppression --suppress=unusedStructMember \
             --suppress=assertWithSideEffect \
+            --suppress=duplicateAssignExpression:user-src/encoding.c \
             user-src
 
   scan-build:

@@ -6,6 +6,7 @@ set -eu
 cd "$(dirname "$0")"
 CC="${CC:-cc}"
 CFLAGS="${CFLAGS:--Wall -Wextra -O2}"
+RUNNER="${RUNNER:-}"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
@@ -24,7 +25,8 @@ for f in *.c; do
 		fail=1
 		continue
 	fi
-	if out="$("$tmp/$name")"; then
+	# shellcheck disable=SC2086
+	if out="$($RUNNER "$tmp/$name")"; then
 		echo "ok   - $out"
 	else
 		echo "FAIL - $f"

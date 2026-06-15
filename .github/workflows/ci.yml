@@ -22,6 +22,28 @@ jobs:
       - name: Build and run selftests
         run: ./user-src/selftest/run.sh
 
+  sanitizers:
+    name: Selftests (ASan+UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run selftests under AddressSanitizer + UndefinedBehaviorSanitizer
+        run: |
+          CFLAGS="-Wall -Wextra -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all" \
+            ./user-src/selftest/run.sh
+
+  valgrind:
+    name: Selftests (valgrind)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Run selftests under valgrind
+        run: |
+          RUNNER="valgrind --error-exitcode=1 --leak-check=full --errors-for-leak-kinds=definite,indirect --track-origins=yes -q" \
+            ./user-src/selftest/run.sh
+
   discover:
     name: Resolve wolfSSL versions
     runs-on: ubuntu-latest

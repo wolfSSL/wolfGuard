@@ -1,0 +1,55 @@
+name: Static analysis
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cppcheck:
+    name: cppcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - name: Run cppcheck on userland sources
+        run: |
+          cppcheck --error-exitcode=1 --quiet --inline-suppr \
+            --enable=warning \
+            --suppress=missingInclude --suppress=missingIncludeSystem \
+            --suppress=unmatchedSuppression --suppress=unusedStructMember \
+            --suppress=assertWithSideEffect \
+            user-src
+
+  scan-build:
+    name: scan-build (tools)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tools autoconf automake libtool pkg-config
+      - name: Build and install wolfSSL (master)
+        run: |
+          git clone --depth 1 --branch master \
+            https://github.com/wolfSSL/wolfssl.git "$HOME/wolfssl-src"
+          cd "$HOME/wolfssl-src"
+          ./autogen.sh
+          ./configure --quiet --enable-wolfguard --enable-all-asm \
+            --prefix="$HOME/wolfssl-install"
+          make -j"$(nproc)"
+          make install
+      - name: scan-build wg-fips
+        run: |
+          export PKG_CONFIG_PATH="$HOME/wolfssl-install/lib/pkgconfig"
+          scan-build --status-bugs make -C user-src

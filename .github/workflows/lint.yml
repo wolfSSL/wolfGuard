@@ -1,0 +1,70 @@
+name: Lint
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checkpatch:
+    name: checkpatch (changed kernel code)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run checkpatch on changed kernel-src lines
+        run: |
+          curl -sSL -o /tmp/checkpatch.pl \
+            https://raw.githubusercontent.com/torvalds/linux/master/scripts/checkpatch.pl
+          chmod +x /tmp/checkpatch.pl
+          git fetch --quiet origin "${{ github.base_ref }}"
+          git diff "origin/${{ github.base_ref }}...HEAD" \
+            -- 'kernel-src/*.c' 'kernel-src/*.h' 'kernel-src/**/*.c' 'kernel-src/**/*.h' \
+            > /tmp/diff.patch || true
+          if [ ! -s /tmp/diff.patch ]; then
+            echo "No kernel-src changes to check."
+            exit 0
+          fi
+          /tmp/checkpatch.pl --no-tree --no-signoff --show-types - < /tmp/diff.patch \
+            | tee /tmp/cp.txt || true
+          if grep -q '^ERROR:' /tmp/cp.txt; then
+            echo "::error::checkpatch reported ERROR-level issues in changed kernel code"
+            exit 1
+          fi
+          echo "No checkpatch ERRORs in changed kernel code."
+
+  codespell:
+    name: codespell (changed files)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install codespell
+        run: pip install codespell
+      - name: Run codespell on changed files
+        run: |
+          git fetch --quiet origin "${{ github.base_ref }}"
+          files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+            | grep -E '\.(c|h|sh|md|yml)$' || true)
+          if [ -z "$files" ]; then
+            echo "No relevant changed files."
+            exit 0
+          fi
+          echo "$files"
+          # shellcheck disable=SC2086
+          codespell \
+            --ignore-words-list='nd,te,sav,fo,ot,parms,iput,sock,clen,referer,crypted,ba,inout,alloc,dout' \
+            $files

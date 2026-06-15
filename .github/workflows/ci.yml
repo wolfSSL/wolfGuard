@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selftests:
+    name: Selftests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run selftests
+        run: ./user-src/selftest/run.sh
+
+  tools:
+    name: wg-fips tools (wolfSSL ${{ matrix.wolfssl }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wolfssl: [ master ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config
+      - name: Build and install wolfSSL (${{ matrix.wolfssl }})
+        run: |
+          git clone --depth 1 --branch ${{ matrix.wolfssl }} \
+            https://github.com/wolfSSL/wolfssl.git "$HOME/wolfssl-src"
+          cd "$HOME/wolfssl-src"
+          ./autogen.sh
+          ./configure --quiet --enable-wolfguard --enable-all-asm \
+            --prefix="$HOME/wolfssl-install"
+          make -j"$(nproc)"
+          make install
+      - name: Build wg-fips
+        run: |
+          export PKG_CONFIG_PATH="$HOME/wolfssl-install/lib/pkgconfig"
+          make -C user-src -j"$(nproc)"
+      - name: Build wg-fips with public-key compression
+        run: |
+          export PKG_CONFIG_PATH="$HOME/wolfssl-install/lib/pkgconfig"
+          make -C user-src clean
+          make -C user-src -j"$(nproc)" EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION
+
+  kmod:
+    name: Kernel module build (best effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool bc \
+            "linux-headers-$(uname -r)"
+      - name: Build libwolfssl kernel module
+        run: |
+          git clone --depth 1 --branch master \
+            https://github.com/wolfSSL/wolfssl.git "$HOME/wolfssl-km"
+          cd "$HOME/wolfssl-km"
+          ./autogen.sh
+          ./configure --quiet --enable-wolfguard --enable-cryptonly --enable-linuxkm \
+            --with-linux-source="/lib/modules/$(uname -r)/build"
+          make -j"$(nproc)" module
+      - name: Build wolfguard.ko
+        run: |
+          make -C kernel-src -j"$(nproc)" \
+            KERNELDIR="/lib/modules/$(uname -r)/build"

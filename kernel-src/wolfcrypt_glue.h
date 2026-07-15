@@ -7,9 +7,10 @@
 #define WOLFCRYPTO_SHIM_H
 
 #include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #if !defined(HAVE_AESGCM) || (!defined(HAVE_AESGCM_DECRYPT) && defined(NO_AES_DECRYPT))
-    #error libwolfssl missing AES-GCM with streaming
+    #error libwolfssl missing AES-GCM
 #endif
 #if defined(NO_SHA256)
     #error libwolfssl missing SHA256
@@ -69,6 +70,7 @@
 #define WC_DEBUG_PR_NULL_RET(x) do { typeof(x) _ret = (x); if (! _ret) { pr_notice("value is NULL at %s %s L %d\n", __FILE__, __FUNCTION__, __LINE__); dump_stack(); } return _ret; } while (0)
 #define WC_DEBUG_PR_VOID_RET do { pr_notice("return at %s %s L %d\n", __FILE__, __FUNCTION__, __LINE__); dump_stack(); return; } while (0)
 #define WC_DEBUG_PR_CODEPOINT() pr_notice("codepoint at %s %s L %d\n", __FILE__, __FUNCTION__, __LINE__)
+#define WC_DEBUG_PR_CODEPOINT_VAL(val) pr_notice("codepoint at %s %s L %d, val %d\n", __FILE__, __FUNCTION__, __LINE__, val)
 #define WC_DEBUG_PR(fmt, ...) pr_notice("%s %s L %d: " fmt, __FILE__, __FUNCTION__, __LINE__, ## __VA_ARGS__)
 
 #else
@@ -79,6 +81,7 @@
 #define WC_DEBUG_PR_NULL_RET(x) return(x)
 #define WC_DEBUG_PR_VOID_RET return
 #define WC_DEBUG_PR_CODEPOINT() WC_DO_NOTHING
+#define WC_DEBUG_PR_CODEPOINT_VAL(val) WC_DO_NOTHING
 #define WC_DEBUG_PR(fmt, ...) WC_DO_NOTHING
 
 #endif
@@ -182,18 +185,6 @@ static inline u32 wc_3u32_keyed_hash(const byte *key, const size_t key_len, u32 
     } ubuf = { .u1 = u1, .u2 = u2, .u3 = u3 };
     return wc_u32_keyed_hash(key, key_len, (byte *)&ubuf, sizeof(ubuf));
 }
-
-extern int wc_AesGcm_Appended_Tag_Encrypt(Aes* aes, byte* out, word32 out_space,
-                                          const byte* in, word32 in_sz,
-                                          const byte* iv, word32 iv_sz,
-                                          const byte* authIn, word32 authIn_sz,
-                                          const word32 authtag_len);
-
-extern int wc_AesGcm_Appended_Tag_Decrypt(Aes* aes, byte* out, word32 out_space,
-                                          const byte* in, word32 in_sz,
-                                          const byte* iv, word32 iv_sz,
-                                          const byte* authIn, word32 authIn_sz,
-                                          const word32 authtag_len);
 
 extern int wc_AesGcm_oneshot_encrypt(byte* out, size_t out_space, const byte* key, size_t keySz, const byte* in, size_t inSz,
                    const byte* iv, size_t ivSz,

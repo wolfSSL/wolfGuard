@@ -533,6 +533,10 @@ static int __must_check message_encrypt(u8 *dst_ciphertext, size_t dst_ciphertex
 			    size_t src_len, u8 key[NOISE_SYMMETRIC_KEY_LEN],
 			    u8 hash[NOISE_HASH_LEN])
 {
+	/* For Noise_IK, an all-zeros IV is used, and the key itself guarantees
+	 * uniqueness of the { key, iv } tuple, via wc_ecc_make_keypair_exim(),
+	 * mix_dh(), mix_precomputed_dh(), and mix_psk().
+	 */
 	int ret = wc_AesGcm_oneshot_encrypt(dst_ciphertext, dst_ciphertext_space, key, NOISE_SYMMETRIC_KEY_LEN, src_plaintext, src_len,
 					    NULL /* iv */, 0,
 					    hash, NOISE_HASH_LEN, NOISE_AUTHTAG_LEN);
@@ -721,7 +725,7 @@ wg_noise_handshake_consume_initiation(struct message_handshake_initiation *src,
 		goto out;
 	}
 
-        /* Get an exclusive lock here, even though initially we only need a read
+	/* Get an exclusive lock here, even though initially we only need a read
 	 * lock -- this avoids a race window after the defensive tests and
 	 * before storing the new ephemeral key.  The attack tests have a
 	 * negligible CPU footprint, so the atomic ops (identically expensive

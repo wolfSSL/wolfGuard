@@ -208,8 +208,10 @@ static int wg_receive_handshake_packet(struct wg_device *wg,
 			wg_packet_send_keepalive(peer);
 			ret = 0;
 		}
-		else
+		else {
+			WC_DEBUG_PR_CODEPOINT();
 			ret = -ECANCELED;
+		}
 		break;
 	}
 	}

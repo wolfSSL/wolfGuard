@@ -72,7 +72,7 @@ int wc_hmac_oneshot(const int type, byte *out, const size_t out_space, const byt
 
 static const byte ZeroNonce[AES_IV_SIZE] = {};
 
-int wc_AesGcm_Appended_Tag_Encrypt(Aes* aes, byte* out, word32 out_space,
+static int wc_AesGcm_Appended_Tag_Encrypt(Aes* aes, byte* out, word32 out_space,
                                    const byte* in, word32 in_sz,
                                    const byte* iv, word32 iv_sz,
                                    const byte* authIn, word32 authIn_sz,
@@ -88,12 +88,40 @@ int wc_AesGcm_Appended_Tag_Encrypt(Aes* aes, byte* out, word32 out_space,
 		iv_sz = sizeof(ZeroNonce);
 	}
 
+#ifdef WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED
 	WC_DEBUG_PR_NEG_RET(wc_AesGcmEncrypt(aes, out, in, in_sz, iv, iv_sz,
-                                            out + in_sz, authTag_len,
-                                            authIn, authIn_sz));
+					     out + in_sz, authTag_len,
+					     authIn, authIn_sz));
+#else /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
+	/* avoid wc_AesGcmEncrypt(), to stay in-boundary for FIPS. */
+    #ifdef WOLFSSL_AESGCM_STREAM
+	{
+		int ret = wc_AesGcmInit(aes, NULL /* key */, 0 /* len */, iv, iv_sz);
+		if (ret < 0)
+			WC_DEBUG_PR_NEG_RET(ret);
+		ret = wc_AesGcmEncryptUpdate(aes, out, in, in_sz, authIn, authIn_sz);
+		if (ret < 0)
+			WC_DEBUG_PR_NEG_RET(ret);
+		WC_DEBUG_PR_NEG_RET(wc_AesGcmEncryptFinal(aes, out + in_sz, authTag_len));
+	}
+    #else
+	{
+		byte ivOut[GCM_NONCE_MAX_SZ];
+		int ret;
+		if (iv_sz > GCM_NONCE_MAX_SZ)
+			WC_DEBUG_PR_NEG_RET(BAD_LENGTH_E);
+		ret = wc_AesGcmSetExtIV(aes, iv, iv_sz);
+		if (ret < 0)
+			WC_DEBUG_PR_NEG_RET(ret);
+		WC_DEBUG_PR_NEG_RET(wc_AesGcmEncrypt_ex(aes, out, in, in_sz, ivOut, iv_sz,
+							out + in_sz, authTag_len,
+							authIn, authIn_sz));
+	}
+    #endif
+#endif /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
 }
 
-int wc_AesGcm_Appended_Tag_Decrypt(Aes* aes, byte* out, word32 out_space,
+static int wc_AesGcm_Appended_Tag_Decrypt(Aes* aes, byte* out, word32 out_space,
                                    const byte* in, word32 in_sz,
                                    const byte* iv, word32 iv_sz,
                                    const byte* authIn, word32 authIn_sz,
@@ -175,6 +203,17 @@ int wc_AesGcm_oneshot_decrypt(byte* out, size_t out_space, const byte* key, size
 }
 
 #ifdef WOLFSSL_AESGCM_STREAM
+
+/* Don't incur the FIPS check overhead inside the loop -- the Final() call
+ * below will check and error if the module entered degraded state during
+ * the loop.
+ */
+#if defined(HAVE_FIPS) && !defined(FIPS_NO_WRAPPERS)
+    #undef wc_AesGcmDecryptUpdate
+    #undef wc_AesGcmEncryptUpdate
+    typeof(wc_AesGcmDecryptUpdate_fips) wc_AesGcmDecryptUpdate;
+    typeof(wc_AesGcmEncryptUpdate_fips) wc_AesGcmEncryptUpdate;
+#endif
 
 static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, const size_t src_len,
 						       const u8 *ad, const size_t ad_len,
@@ -319,6 +358,11 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
     return ret == 0;
 }
 
+#if defined(HAVE_FIPS) && !defined(FIPS_NO_WRAPPERS)
+    #define wc_AesGcmDecryptUpdate wc_AesGcmDecryptUpdate_fips
+    #define wc_AesGcmEncryptUpdate wc_AesGcmEncryptUpdate_fips
+#endif
+
 #else /* !WOLFSSL_AESGCM_STREAM */
 
 static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, const size_t src_len,
@@ -400,13 +444,36 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
                                    full_nonce, (word32)sizeof(full_nonce),
                                    miter.addr + length, WC_AES_BLOCK_SIZE,
                                    ad, (word32)ad_len);
+            if (ret < 0)
+                WC_DEBUG_PR_CODEPOINT_VAL(ret);
         }
         else {
+#ifdef WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED
             ret = wc_AesGcmEncrypt(aes, miter.addr,
                                    miter.addr, (word32)length,
                                    full_nonce, (word32)sizeof(full_nonce),
                                    miter.addr + length, WC_AES_BLOCK_SIZE,
                                    ad, (word32)ad_len);
+	    if (ret < 0)
+		WC_DEBUG_PR_CODEPOINT_VAL(ret);
+#else /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
+            /* Use wc_AesGcmSetExtIV() and wc_AesGcmEncrypt_ex(), not
+             * wc_AesGcmEncrypt(), to stay in-boundary for FIPS.
+             */
+            byte ivOut[GCM_NONCE_MAX_SZ];
+            ret = wc_AesGcmSetExtIV(aes, full_nonce, (word32)sizeof(full_nonce));
+            if (ret == 0) {
+                    ret = wc_AesGcmEncrypt_ex(aes, miter.addr,
+                                   miter.addr, (word32)length,
+                                   ivOut, (word32)sizeof(full_nonce),
+                                   miter.addr + length, WC_AES_BLOCK_SIZE,
+                                   ad, (word32)ad_len);
+                    if (ret < 0)
+                            WC_DEBUG_PR_CODEPOINT_VAL(ret);
+            }
+            else
+                WC_DEBUG_PR_CODEPOINT_VAL(ret);
+#endif /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
         }
 
         sg_miter_stop(&miter);
@@ -437,11 +504,32 @@ static __always_inline bool wc_AesGcm_crypt_sg_inplace(struct scatterlist *src, 
         }
         else {
             scatterwalk_map_and_copy(buf, src, 0, src_len, 0);
+#ifdef WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED
             ret = wc_AesGcmEncrypt(aes, buf,
                                    buf, (word32)src_len,
                                    full_nonce, (word32)sizeof(full_nonce),
                                    buf + src_len, WC_AES_BLOCK_SIZE,
                                    ad, (word32)ad_len);
+            if (ret < 0)
+                WC_DEBUG_PR_CODEPOINT_VAL(ret);
+#else /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
+            {
+                    /* Avoid wc_AesGcmEncrypt() to stay in-boundary for FIPS. */
+                    byte ivOut[GCM_NONCE_MAX_SZ];
+                    ret = wc_AesGcmSetExtIV(aes, full_nonce, (word32)sizeof(full_nonce));
+                    if (ret == 0) {
+                            ret = wc_AesGcmEncrypt_ex(aes, buf,
+                                                      buf, (word32)src_len,
+                                                      ivOut, (word32)sizeof(full_nonce),
+                                                      buf + src_len, WC_AES_BLOCK_SIZE,
+                                                      ad, (word32)ad_len);
+                            if (ret < 0)
+                                    WC_DEBUG_PR_CODEPOINT_VAL(ret);
+                    }
+                    else
+                            WC_DEBUG_PR_CODEPOINT_VAL(ret);
+            }
+#endif /* !WC_FIPS_AESGCM_ONE_SHOT_EXT_IV_ALLOWED */
             if (ret == 0)
                 scatterwalk_map_and_copy(buf, src, 0, src_len + WC_AES_BLOCK_SIZE, 1);
             else
@@ -889,6 +977,8 @@ new_bank:
             WC_DUMP_BACKTRACE_NONDEBUG;
         }
     }
+    else
+        WC_DEBUG_PR_CODEPOINT_VAL(ret);
 
     return (ret == 0) ? ret : -ECANCELED;
 }

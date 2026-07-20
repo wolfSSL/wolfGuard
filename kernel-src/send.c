@@ -48,13 +48,19 @@ static int __must_check wg_packet_send_handshake_initiation(struct wg_peer *peer
 				wg_timers_any_authenticated_packet_traversal(peer);
 				wg_timers_any_authenticated_packet_sent(peer);
 			}
+			else
+				WC_DEBUG_PR_CODEPOINT_VAL(ret);
 		}
+		else
+			WC_DEBUG_PR_CODEPOINT_VAL(ret);
 		wg_timers_handshake_initiated(peer); /* restart retry timer even
 						      * if send failed.
 						      */
 	}
-	else
+	else {
+		WC_DEBUG_PR_CODEPOINT();
 		ret = -ECANCELED;
+	}
 
 	if (ret != 0)
 		(void)atomic64_cmpxchg_relaxed(&peer->last_sent_handshake,
@@ -132,7 +138,10 @@ int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 		if (ret == 0) {
 			if (! wg_noise_handshake_begin_session(&peer->handshake,
 							       &peer->keypairs))
+			{
+				WC_DEBUG_PR_CODEPOINT();
 				ret = -ECANCELED;
+			}
 		}
 		if (ret == 0) {
 			wg_timers_session_derived(peer);
@@ -145,8 +154,10 @@ int __must_check wg_packet_send_handshake_response(struct wg_peer *peer)
 						      HANDSHAKE_DSCP);
 		}
 	}
-	else
+	else {
+		WC_DEBUG_PR_CODEPOINT();
 		ret = -ECANCELED;
+	}
 
 	memzero_explicit(&packet, sizeof packet);
 

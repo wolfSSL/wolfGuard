@@ -18,6 +18,7 @@
 #include "containers.h"
 #include "ipc.h"
 #include "encoding.h"
+#include "terminal.h"
 #include "ctype.h"
 
 #define COMMENT_CHAR '#'
@@ -118,7 +119,10 @@ static inline bool parse_private_key(uint8_t key[static WG_PRIVATE_KEY_LEN], con
 static inline bool parse_public_key(uint8_t key[static WG_PUBLIC_KEY_LEN], const char *value, size_t value_len)
 {
 	if (!wg_from_base64(key, WG_PUBLIC_KEY_LEN, value, value_len)) {
-		fprintf(stderr, "Public key is not the correct length or format: `%s'\n", value);
+		char safe[256];
+
+		terminal_sanitize(value, safe, sizeof safe);
+		fprintf(stderr, "Public key is not the correct length or format: `%s'\n", safe);
 		memset(key, 0, WG_PUBLIC_KEY_LEN);
 		return false;
 	}
@@ -198,7 +202,10 @@ static inline bool parse_ip(struct wgallowedip *allowedip, const char *value)
 			allowedip->family = AF_INET;
 	}
 	if (allowedip->family == AF_UNSPEC) {
-		fprintf(stderr, "Unable to parse IP address: `%s'\n", value);
+		char safe[256];
+
+		terminal_sanitize(value, safe, sizeof safe);
+		fprintf(stderr, "Unable to parse IP address: `%s'\n", safe);
 		return false;
 	}
 	return true;
@@ -216,7 +223,10 @@ static inline int parse_dns_retries(void)
 
 	ret = strtoul(retries, &end, 10);
 	if (*end || ret > INT_MAX) {
-		fprintf(stderr, "Unable to parse WG_ENDPOINT_RESOLUTION_RETRIES: `%s'\n", retries);
+		char safe[256];
+
+		terminal_sanitize(retries, safe, sizeof safe);
+		fprintf(stderr, "Unable to parse WG_ENDPOINT_RESOLUTION_RETRIES: `%s'\n", safe);
 		exit(1);
 	}
 	return (int)ret;

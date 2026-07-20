@@ -203,10 +203,10 @@ void wg_peer_remove_all(struct wg_device *wg)
 
 	list_for_each_entry_safe(peer, temp, &wg->peer_list, peer_list) {
 		peer_make_dead(peer);
-		list_add_tail(&peer->peer_list, &dead_peers);
+		list_add_tail(&peer->dead_peer_list, &dead_peers);
 	}
 	synchronize_rcu();
-	list_for_each_entry_safe(peer, temp, &dead_peers, peer_list)
+	list_for_each_entry_safe(peer, temp, &dead_peers, dead_peer_list)
 		peer_remove_after_dead(peer);
 }
 

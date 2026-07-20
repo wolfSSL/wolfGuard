@@ -40,7 +40,7 @@ int pubkey_main(int argc, char *argv[])
 
 	for (;;) {
 		int trailing_char = getc(stdin);
-		if (!trailing_char || char_is_space(trailing_char))
+		if (trailing_char != EOF && char_is_space(trailing_char))
 			continue;
 		if (trailing_char == EOF)
 			break;
@@ -131,7 +131,7 @@ int pubkey_main(int argc, char *argv[])
 
 	for (;;) {
 		trailing_char = getc(stdin);
-		if (!trailing_char || char_is_space(trailing_char))
+		if (trailing_char != EOF && char_is_space(trailing_char))
 			continue;
 		if (trailing_char == EOF)
 			break;

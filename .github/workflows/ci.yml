@@ -1,0 +1,134 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  selftests:
+    name: Selftests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run selftests
+        run: ./user-src/selftest/run.sh
+
+  sanitizers:
+    name: Selftests (ASan+UBSan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run selftests under AddressSanitizer + UndefinedBehaviorSanitizer
+        run: |
+          CFLAGS="-Wall -Wextra -O1 -g -fsanitize=address,undefined -fno-sanitize-recover=all" \
+            ./user-src/selftest/run.sh
+
+  valgrind:
+    name: Selftests (valgrind)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Run selftests under valgrind
+        run: |
+          RUNNER="valgrind --error-exitcode=1 --leak-check=full --errors-for-leak-kinds=definite,indirect --track-origins=yes -q" \
+            ./user-src/selftest/run.sh
+
+  discover:
+    name: Resolve wolfSSL versions
+    runs-on: ubuntu-latest
+    outputs:
+      refs: ${{ steps.resolve.outputs.refs }}
+    steps:
+      - name: Resolve wolfSSL refs (latest -stable, v5.8.4-stable, master)
+        id: resolve
+        run: |
+          set -euo pipefail
+          LATEST=$(git ls-remote --tags --refs https://github.com/wolfSSL/wolfssl.git 'v*-stable' \
+                     | awk -F/ '{print $NF}' | sort -V | tail -n 1)
+          if [ -z "${LATEST:-}" ]; then
+            echo "::error::Could not resolve latest wolfSSL -stable tag"
+            exit 1
+          fi
+          echo "Latest stable wolfSSL: $LATEST"
+          REFS=$(jq -nc --arg latest "$LATEST" '[$latest, "v5.8.4-stable", "master"] | unique')
+          echo "refs=$REFS" >> "$GITHUB_OUTPUT"
+          echo "Testing refs: $REFS"
+
+  tools:
+    name: wg-fips tools (wolfSSL ${{ matrix.wolfssl }})
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wolfssl: ${{ fromJson(needs.discover.outputs.refs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config
+      - name: Build and install wolfSSL (${{ matrix.wolfssl }})
+        run: |
+          git clone --depth 1 --branch "${{ matrix.wolfssl }}" \
+            https://github.com/wolfSSL/wolfssl.git "$HOME/wolfssl-src"
+          cd "$HOME/wolfssl-src"
+          ./autogen.sh
+          ./configure --quiet --enable-wolfguard --enable-all-asm \
+            --prefix="$HOME/wolfssl-install"
+          make -j"$(nproc)"
+          make install
+      - name: Build wg-fips
+        run: |
+          export PKG_CONFIG_PATH="$HOME/wolfssl-install/lib/pkgconfig"
+          make -C user-src -j"$(nproc)"
+      - name: Build wg-fips with public-key compression
+        run: |
+          export PKG_CONFIG_PATH="$HOME/wolfssl-install/lib/pkgconfig"
+          make -C user-src clean
+          make -C user-src -j"$(nproc)" EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION
+
+  kmod:
+    name: Kernel module (wolfSSL ${{ matrix.wolfssl }})
+    needs: discover
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        wolfssl: ${{ fromJson(needs.discover.outputs.refs) }}
+    env:
+      WOLFSSL_ROOT: ${{ github.workspace }}/wolfssl-km
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf automake libtool bc \
+            "linux-headers-$(uname -r)"
+      - name: Build libwolfssl kernel module (${{ matrix.wolfssl }})
+        run: |
+          git clone --depth 1 --branch "${{ matrix.wolfssl }}" \
+            https://github.com/wolfSSL/wolfssl.git "$WOLFSSL_ROOT"
+          cd "$WOLFSSL_ROOT"
+          ./autogen.sh
+          ./configure --quiet --enable-wolfguard --enable-cryptonly --enable-linuxkm \
+            --with-linux-source="/lib/modules/$(uname -r)/build" \
+            --prefix="$WOLFSSL_ROOT/linuxkm/build"
+          make -j"$(nproc)" module
+      - name: Build wolfguard.ko
+        run: |
+          make -C kernel-src -j"$(nproc)" \
+            KERNELDIR="/lib/modules/$(uname -r)/build" \
+            WOLFSSL_ROOT="$WOLFSSL_ROOT" \
+            WOLFSSL_INCLUDE="$WOLFSSL_ROOT"

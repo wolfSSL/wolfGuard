@@ -30,6 +30,7 @@ static int userspace_set_device(struct wgdevice *dev)
 	struct wgallowedip *allowedip;
 	FILE *f;
 	int ret;
+	unsigned long long e;
 	socklen_t addr_len;
 
 	f = userspace_interface_file(dev->name);
@@ -152,10 +153,12 @@ static int userspace_set_device(struct wgdevice *dev)
 		goto out;
 	}
 
-	if (fscanf(f, "errno=%d\n\n", &ret) != 1)
+	if (fscanf(f, "errno=%llu\n\n", &e) != 1)
 		ret = errno ? -errno : -EPROTO;
+	else if (e > INT_MAX)
+		ret = -EPROTO;
 	else
-		ret = -ret;
+		ret = -(int)e;
 
 out:
 

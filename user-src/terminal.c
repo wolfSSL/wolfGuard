@@ -42,7 +42,7 @@ static void filter_ansi(const char *fmt, va_list args)
 	len = vasprintf(&str, fmt, args);
 
 	if (len >= 2) {
-		for (i = 0; i < len - 2; ++i) {
+		for (i = 0; i < len - 1; ++i) {
 			if (str[i] == '\x1b' && str[i + 1] == '[') {
 				str[i] = str[i + 1] = '\0';
 				for (j = i + 2; j < len; ++j) {
@@ -72,4 +72,20 @@ void terminal_printf(const char *fmt, ...)
 	va_start(args, fmt);
 	filter_ansi(fmt, args);
 	va_end(args);
+}
+
+void terminal_sanitize(const char *in, char *out, size_t outlen)
+{
+	size_t i = 0;
+
+	if (!out || !outlen)
+		return;
+	if (in) {
+		for (; in[i] && i + 1 < outlen; ++i) {
+			unsigned char c = (unsigned char)in[i];
+
+			out[i] = (c >= 0x20 && c < 0x7f) ? in[i] : '?';
+		}
+	}
+	out[i] = '\0';
 }

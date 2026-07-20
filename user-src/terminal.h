@@ -8,6 +8,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include <stddef.h>
+
 #define TERMINAL_FG_BLACK	"\x1b[30m"
 #define TERMINAL_FG_RED		"\x1b[31m"
 #define TERMINAL_FG_GREEN	"\x1b[32m"
@@ -49,5 +51,6 @@
 #define TERMINAL_CLEAR_ALL	"\x1b[2J"
 
 void terminal_printf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+void terminal_sanitize(const char *in, char *out, size_t outlen);
 
 #endif

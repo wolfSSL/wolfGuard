@@ -96,9 +96,29 @@ static void wg_ratelimiter_gc_entries(struct work_struct *work)
 		queue_delayed_work(system_power_efficient_wq, &gc_work, HZ);
 }
 
+static bool ratelimiter_charge_entry(struct ratelimiter_entry *entry)
+{
+	u64 now, tokens;
+	bool ret;
+
+	/* Quasi-inspired by nft_limit.c, but this is actually a slightly
+	 * different algorithm. Namely, we incorporate the burst as part of the
+	 * maximum tokens, rather than as part of the rate.
+	 */
+	spin_lock(&entry->lock);
+	now = ktime_get_coarse_boottime_ns();
+	tokens = min_t(u64, TOKEN_MAX,
+		       entry->tokens + now - entry->last_time_ns);
+	entry->last_time_ns = now;
+	ret = tokens >= PACKET_COST;
+	entry->tokens = ret ? tokens - PACKET_COST : tokens;
+	spin_unlock(&entry->lock);
+	return ret;
+}
+
 bool wg_ratelimiter_allow(struct sk_buff *skb, struct net *net)
 {
-	struct ratelimiter_entry *entry;
+	struct ratelimiter_entry *entry, *entry_existing;
 	struct hlist_head *bucket;
 	u64 ip;
 
@@ -120,22 +140,8 @@ bool wg_ratelimiter_allow(struct sk_buff *skb, struct net *net)
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(entry, bucket, hash) {
 		if (entry->net == net && entry->ip == ip) {
-			u64 now, tokens;
-			bool ret;
-			/* Quasi-inspired by nft_limit.c, but this is actually a
-			 * slightly different algorithm. Namely, we incorporate
-			 * the burst as part of the maximum tokens, rather than
-			 * as part of the rate.
-			 */
-			spin_lock(&entry->lock);
-			now = ktime_get_coarse_boottime_ns();
-			tokens = min_t(u64, TOKEN_MAX,
-				       entry->tokens + now -
-					       entry->last_time_ns);
-			entry->last_time_ns = now;
-			ret = tokens >= PACKET_COST;
-			entry->tokens = ret ? tokens - PACKET_COST : tokens;
-			spin_unlock(&entry->lock);
+			bool ret = ratelimiter_charge_entry(entry);
+
 			rcu_read_unlock();
 			return ret;
 		}
@@ -156,6 +162,16 @@ bool wg_ratelimiter_allow(struct sk_buff *skb, struct net *net)
 	entry->last_time_ns = ktime_get_coarse_boottime_ns();
 	entry->tokens = TOKEN_MAX - PACKET_COST;
 	spin_lock(&table_lock);
+	hlist_for_each_entry(entry_existing, bucket, hash) {
+		if (entry_existing->net == net && entry_existing->ip == ip) {
+			bool ret = ratelimiter_charge_entry(entry_existing);
+
+			spin_unlock(&table_lock);
+			kmem_cache_free(entry_cache, entry);
+			atomic_dec(&total_entries);
+			return ret;
+		}
+	}
 	hlist_add_head_rcu(&entry->hash, bucket);
 	spin_unlock(&table_lock);
 	return true;

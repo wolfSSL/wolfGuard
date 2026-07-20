@@ -792,6 +792,7 @@ err_buf_alloc:
 static void mnlg_socket_close(struct mnlg_socket *nlg)
 {
 	mnl_socket_close(nlg->nl);
+	memzero_explicit(nlg->buf, mnl_ideal_socket_buffer_size());
 	free(nlg->buf);
 	free(nlg);
 }

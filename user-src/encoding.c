@@ -195,7 +195,7 @@ bool wg_from_base64(uint8_t *out, size_t outLen, const char *in, size_t inLen) {
             break;
     }
 
-    return (outLen == i);
+    return (outLen == i) && (inLen == 0);
 }
 
 static const __attribute__((aligned(64))) uint8_t hexDecode[] =
@@ -312,6 +312,8 @@ bool wg_from_base64(uint8_t *raw, size_t raw_len, const char *base64, size_t bas
     word32 raw_len_out;
     int ret;
     if ((raw_len > UINT_MAX) || (base64_len > UINT_MAX))
+        return false;
+    if (base64_len != WG_BASE64_LEN(raw_len) - 1)
         return false;
     raw_len_out = (word32)raw_len;
     ret = Base64_Decode((byte *)base64, base64_len, raw, &raw_len_out);

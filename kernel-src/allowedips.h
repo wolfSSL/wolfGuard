@@ -35,6 +35,7 @@ struct allowedips {
 	struct allowedips_node __rcu *root4;
 	struct allowedips_node __rcu *root6;
 	u64 seq;
+	u64 node_count;
 };
 
 void wg_allowedips_init(struct allowedips *table);

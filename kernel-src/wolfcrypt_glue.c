@@ -12,7 +12,7 @@
 	#error WG_USE_PUBLIC_KEY_COMPRESSION requires HAVE_COMP_KEY
 #endif
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
 
 #include <crypto/rng.h>
 
@@ -579,7 +579,7 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,
                              const int curve_id, int compressed)
 {
-#ifndef WC_DRBG_BANKREF
+#ifndef WC_HAVE_RNG_BANKREF
         struct wc_rng_inst *rng_inst = NULL;
 #endif
         WC_RNG *rng = NULL;
@@ -604,7 +604,7 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
             goto out;
         key_inited = 1;
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
         ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
         if (ret)
             goto out;
@@ -664,7 +664,7 @@ int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
 
 out:
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
         wc_rng_free(rng);
 #else
         if (rng_inst)
@@ -709,12 +709,12 @@ int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
             goto out;
 
         {
-#ifndef WC_DRBG_BANKREF
+#ifndef WC_HAVE_RNG_BANKREF
             struct wc_rng_inst *rng_inst;
 #endif
             WC_RNG *rng;
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
             ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
             if (ret)
                 goto out;
@@ -729,7 +729,7 @@ int wc_ecc_private_to_public_exim(const u8 *private, const size_t private_len,
 
             ret = wc_ecc_make_pub_ex(key, NULL /* pubOut */, rng);
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
             wc_rng_free(rng);
 #else
             put_drbg(rng_inst);
@@ -781,7 +781,7 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
     int privKey_inited = 0, pubKey_inited = 0;
     int ret;
 #ifdef ECC_TIMING_RESISTANT
-#ifndef WC_DRBG_BANKREF
+#ifndef WC_HAVE_RNG_BANKREF
     struct wc_rng_inst *rng_inst = NULL;
 #endif
     WC_RNG *rng = NULL;
@@ -817,7 +817,7 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
     pubKey_inited = 1;
 
 #ifdef ECC_TIMING_RESISTANT
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
     ret = wc_rng_new_bankref(wc_wg_drbg, &rng);
     if (ret) {
         ret = -EFAULT;
@@ -860,7 +860,7 @@ int wc_ecc_shared_secret_exim(u8 *secret, size_t secret_len,
 out:
 
 #ifdef ECC_TIMING_RESISTANT
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
         wc_rng_free(rng);
 #else
         if (rng_inst)
@@ -881,7 +881,7 @@ out:
 	WC_DEBUG_PR_NEG_RET(ret);
 }
 
-#ifdef WC_DRBG_BANKREF
+#ifdef WC_HAVE_RNG_BANKREF
 
 struct wc_rng_bank *wc_wg_drbg;
 static int wc_wg_drbg_is_global_default;
@@ -1121,7 +1121,7 @@ out:
 }
 
 
-#else /* !WC_DRBG_BANKREF */
+#else /* !WC_HAVE_RNG_BANKREF */
 /* snarfed from wolfssl/linuxkm/lkcapi_sha_glue.c */
 struct wc_linuxkm_drbg_ctx wc_wg_drbg;
 
@@ -1351,4 +1351,4 @@ out:
     return 0;
 }
 
-#endif /* !WC_DRBG_BANKREF */
+#endif /* !WC_HAVE_RNG_BANKREF */

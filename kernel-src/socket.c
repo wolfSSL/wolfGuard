@@ -363,7 +363,7 @@ static void sock_free(struct sock *sock)
 	if (unlikely(!sock))
 		return;
 	sk_clear_memalloc(sock);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 2, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 1, 5)
 	udp_tunnel_sock_release(sock->sk_socket);
 #else
 	udp_tunnel_sock_release(sock);
@@ -421,7 +421,7 @@ retry:
 		goto out;
 	}
 	set_sock_opts(new4);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 2, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 1, 5)
 	setup_udp_tunnel_sock(net, new4, &cfg);
 #else
 	setup_udp_tunnel_sock(net, new4->sk, &cfg);
@@ -432,7 +432,7 @@ retry:
 		port6.local_udp_port = inet_sk(new4->sk)->inet_sport;
 		ret = udp_sock_create(net, &port6, &new6);
 		if (ret < 0) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 2, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 1, 5)
 			udp_tunnel_sock_release(new4);
 #else
 			udp_tunnel_sock_release(new4->sk);
@@ -444,7 +444,7 @@ retry:
 			goto out;
 		}
 		set_sock_opts(new6);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 2, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 1, 5)
 		setup_udp_tunnel_sock(net, new6, &cfg);
 #else
 		setup_udp_tunnel_sock(net, new6->sk, &cfg);

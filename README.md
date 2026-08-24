@@ -162,6 +162,14 @@ under `/lib/modules/` where the target kernel's modules are installed.
 The `genkey` and `pubkey` ops in the final line are basic functionality tests.
 If all is well, it will succeed, and print a random public key.
 
+**Note:** When the `wolfguard.ko` kernel module is loaded, `wg genkey` (and
+`wg-fips genkey`) offloads key generation to the kernel module via netlink and
+therefore requires `CAP_NET_ADMIN`.  Non-root users will receive a permission
+error.  To resolve this, either run as root or via `sudo`, or build `wg-fips`
+with `NO_IPC_LLCRYPTO=1` (which selects the userspace key generation path), or
+grant the `wg-fips` binary the `cap_net_admin` file capability
+(`setcap cap_net_admin+ep wg-fips`).
+
 As for the `wg-fips` build above, compressed public key support can be enabled
 by adding `EXTRA_CFLAGS=-DWG_USE_PUBLIC_KEY_COMPRESSION` to the above `make`
 recipe.  The `WG_USE_PUBLIC_KEY_COMPRESSION` setting must be matched throughout
@@ -295,6 +303,14 @@ $ ../user-src/wg-fips genkey | ../user-src/wg-fips pubkey
 
 The `genkey` and `pubkey` ops in the final line are basic functionality tests.
 If all is well, it will succeed, and print a random public key.
+
+**Note:** When the `wolfguard.ko` kernel module is loaded, `wg genkey` (and
+`wg-fips genkey`) offloads key generation to the kernel module via netlink and
+therefore requires `CAP_NET_ADMIN`.  Non-root users will receive a permission
+error.  To resolve this, either run as root or via `sudo`, or build `wg-fips`
+with `NO_IPC_LLCRYPTO=1` (which selects the userspace key generation path), or
+grant the `wg-fips` binary the `cap_net_admin` file capability
+(`setcap cap_net_admin+ep wg-fips`).
 
 As with the non-FIPS-certified procedure, if all of the above succeeds, then you
 are now ready to bring up WolfGuard tunnels.  Existing playbooks and scripting

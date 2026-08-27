@@ -900,9 +900,34 @@ static int linuxkm_affinity_lock(void *arg) {
     return 0;
 }
 
+/* one per CPU for each of task, softirq, hardirq, and NMI, plus 4 slop */
+#define WG_RNG_BANK_SIZE (nr_cpu_ids * 4 + 4)
+
 static int linuxkm_affinity_get_id(void *arg, int *id) {
     (void)arg;
     *id = raw_smp_processor_id();
+    /* Stratify by execution context class -- one band of nr_cpu_ids
+     * instances each for task, softirq, hardirq, and NMI -- so that
+     * same-CPU context nesting never contends for an instance.  Note
+     * in_serving_softirq(), NOT in_softirq(): the latter is also true
+     * whenever softirqs are merely disabled (local_bh_disable(),
+     * spin_lock_bh(), including our own affinity-lock callback), which
+     * would misroute task-context callers into the softirq band.
+     * Order matters: NMI context also carries hardirq state.
+     * Misclassification is never unsafe -- the per-instance CAS lease
+     * is the enforcement -- it only costs the structural-noncontention
+     * property.
+     */
+    if (in_nmi())
+        *id += nr_cpu_ids * 3;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 8, 0)
+    else if (in_hardirq())
+#else
+    else if (in_irq())
+#endif
+        *id += nr_cpu_ids * 2;
+    else if (in_serving_softirq())
+        *id += nr_cpu_ids * 1;
     return 0;
 }
 
@@ -958,7 +983,7 @@ new_bank:
     wc_wg_drbg_is_global_default = 0;
     ret = wc_rng_bank_new(
         ctx,
-        nr_cpu_ids + 4,
+        WG_RNG_BANK_SIZE,
         WC_RNG_BANK_FLAG_NO_VECTOR_OPS,
         30 /* timeout_secs */,
         NULL /* heap */,

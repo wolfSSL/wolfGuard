@@ -207,11 +207,13 @@ extern bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len
                                          const size_t key_len);
 
 /* backward compat */
-#if defined(WC_DRBG_BANKREF) && !defined(WC_HAVE_RNG_BANKREF)
+#if defined(WC_DRBG_BANKREF) && defined(WC_RNG_BANK_SUPPORT) && !defined(WC_HAVE_RNG_BANKREF)
     #define WC_HAVE_RNG_BANKREF
 #endif
 
-#ifdef WC_HAVE_RNG_BANKREF
+#if defined(WC_RNG_BANK_SUPPORT) && (defined(WC_HAVE_RNG_BANKREF) || defined(WC_RNG_HAVE_RBGC))
+
+#define WC_HAVE_RNG_SPAWNING
 
 extern struct wc_rng_bank *wc_wg_drbg;
 int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx);
@@ -221,7 +223,7 @@ int wc_linuxkm_drbg_generate(struct wc_rng_bank **ctx,
                              u8 *dst, unsigned int dlen,
                              int nofail_p);
 
-#else /* !WC_HAVE_RNG_BANKREF */
+#else /* !WC_HAVE_RNG_SPAWNING */
 
 /* snarfed from wolfssl/linuxkm/lkcapi_sha_glue.c */
 struct wc_linuxkm_drbg_ctx {
@@ -242,7 +244,7 @@ int wc_linuxkm_drbg_generate(struct wc_linuxkm_drbg_ctx *ctx,
 int wc_linuxkm_drbg_init_ctx(struct wc_linuxkm_drbg_ctx *ctx);
 void wc_linuxkm_drbg_ctx_clear(struct wc_linuxkm_drbg_ctx * ctx);
 
-#endif /* !WC_HAVE_RNG_BANKREF */
+#endif /* !WC_HAVE_RNG_SPAWNING */
 
 int wc_ecc_make_keypair_exim(u8 *private, const size_t private_len,
                              u8 *public, const size_t public_len,

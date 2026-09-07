@@ -78,6 +78,8 @@ void wg_packet_handshake_send_worker(struct work_struct *work)
 					    transmit_handshake_work);
 	int ret = wg_packet_send_handshake_initiation(peer);
 	wg_peer_put(peer);
+#ifdef DEBUG
+	/* These errors are normal, associated with new partially connected peers. */
 	if (ret != 0) {
 		switch (ret) {
 		case -ENETUNREACH:
@@ -91,6 +93,9 @@ void wg_packet_handshake_send_worker(struct work_struct *work)
 			break;
 		}
 	}
+#else
+	(void)ret;
+#endif
 }
 
 void wg_packet_send_queued_handshake_initiation(struct wg_peer *peer,

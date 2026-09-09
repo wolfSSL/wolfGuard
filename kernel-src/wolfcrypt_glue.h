@@ -211,7 +211,9 @@ extern bool wc_AesGcm_decrypt_sg_inplace(struct scatterlist *src, size_t src_len
     #define WC_HAVE_RNG_BANKREF
 #endif
 
-#if defined(WC_RNG_BANK_SUPPORT) && (defined(WC_HAVE_RNG_BANKREF) || defined(WC_RNG_HAVE_RBGC))
+#if defined(WC_RNG_BANK_SUPPORT) && \
+    (defined(WC_HAVE_RNG_BANKREF) || defined(WC_RNG_HAVE_RBGC)) && \
+    !defined(WC_WG_FORCE_RNG_BANK_FALLBACK)
 
 #define WC_HAVE_RNG_SPAWNING
 

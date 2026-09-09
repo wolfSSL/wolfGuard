@@ -1277,7 +1277,7 @@ struct wc_rng_inst *get_drbg(struct wc_linuxkm_drbg_ctx *ctx) {
 
     for (;;) {
         int expected = 0;
-        if (likely(__atomic_compare_exchange_n(&ctx->rngs[n].lock, &expected, new_lock_value, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE))) {
+        if (likely(wolfSSL_Atomic_Int_CompareExchange(&ctx->rngs[n].lock, &expected, new_lock_value))) {
             struct wc_rng_inst *drbg = &ctx->rngs[n];
             drbg->disabled_vec_ops = (DISABLE_VECTOR_REGISTERS() == 0);
             return drbg;
@@ -1300,7 +1300,7 @@ void put_drbg(struct wc_rng_inst *drbg) {
         REENABLE_VECTOR_REGISTERS();
         drbg->disabled_vec_ops = 0;
     }
-    __atomic_store_n(&(drbg->lock),0,__ATOMIC_RELEASE);
+    WOLFSSL_ATOMIC_STORE(drbg->lock, 0);
     #if defined(CONFIG_SMP) && !defined(CONFIG_PREEMPT_COUNT) && \
         (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0))
     if (migration_disabled)

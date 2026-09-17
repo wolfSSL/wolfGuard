@@ -20,7 +20,7 @@
 #ifdef WC_RNG_HAVE_RBGC
 static int spawn_rng(struct wc_rng_bank *bank, WC_RNG **rng) {
     unsigned long uncredited_nonce = random_get_entropy();
-    int ret = wc_rng_bank_spawn_new(bank, rng, (byte *)&uncredited_nonce, (word32)sizeof uncredited_nonce, 0, 0, WC_RNG_BANK_FLAG_CAN_FAIL_OVER_INST | WC_RNG_BANK_FLAG_PREFER_AFFINITY_INST);
+    int ret = wc_rng_bank_spawn_new(bank, rng, (byte *)&uncredited_nonce, (word32)sizeof uncredited_nonce, NULL, 0, 0, 0, WC_RNG_BANK_FLAG_CAN_FAIL_OVER_INST | WC_RNG_BANK_FLAG_PREFER_AFFINITY_INST);
     if (ret != 0) {
         pr_warn_ratelimited("WARNING: wc_rng_bank_spawn_new() failed "
                             "with code %d; falling through to wc_InitRng().\n",

@@ -306,3 +306,27 @@ exported with exactly 44 characters of base64.  WolfGuard public keys are
 roughly twice that length, unless built with `WG_USE_PUBLIC_KEY_COMPRESSION`,
 which is not currently supported in FIPS v5, but is supported in FIPS v6 and
 later.
+
+
+### Using DKMS for automatic kernel module rebuilds
+
+DKMS (Dynamic Kernel Module Support) automatically rebuilds `wolfguard.ko`
+whenever a new kernel is installed, which is useful on systems with frequent
+kernel updates (e.g. Ubuntu with `unattended-upgrades`).
+
+Before registering wolfguard with DKMS, the built wolfssl source tree must be
+accessible at `/usr/src/wolfssl`.  Create a symlink if your wolfssl tree is
+elsewhere:
+```
+# ln -s /path/to/your/wolfssl /usr/src/wolfssl
+```
+If you prefer not to use `/usr/src/wolfssl`, set `WOLFSSL_ROOT` in the
+environment before running `dkms install` and it will be passed through to the
+build.
+
+Register and install the module (replace `<version>` with the value of
+`PACKAGE_VERSION` in `kernel-src/dkms.conf`):
+```
+# dkms add /path/to/wolfguard/kernel-src
+# dkms install wolfguard/<version>
+```

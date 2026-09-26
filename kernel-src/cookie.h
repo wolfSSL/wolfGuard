@@ -9,6 +9,7 @@
 #define _WG_COOKIE_H
 
 #include "messages.h"
+#include "wolfcrypt_glue.h"
 #include <linux/rwsem.h>
 
 struct wg_peer;
@@ -19,6 +20,10 @@ struct cookie_checker {
 	u8 message_mac1_key[NOISE_SYMMETRIC_KEY_LEN];
 	u64 secret_birthdate;
 	struct rw_semaphore secret_lock;
+	/* Scratch buffer for make_cookie() — avoids per-call kmalloc of the
+	 * 832-byte Hmac struct.  Used only while secret_lock is held for write.
+	 */
+	struct Hmac make_cookie_hmac;
 	struct wg_device *device;
 };
 

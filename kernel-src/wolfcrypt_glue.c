@@ -1006,7 +1006,11 @@ new_bank:
     ret = wc_rng_bank_new(
         ctx,
         WG_RNG_BANK_SIZE,
+#if defined(WOLFSSL_USE_SAVE_VECTOR_REGISTERS) && !defined(WC_SVR_USE_NATIVE_REG_BUFS)
         WC_RNG_BANK_FLAG_NO_VECTOR_OPS,
+#else
+        WC_RNG_BANK_FLAG_NONE,
+#endif
         30 /* timeout_secs */,
         NULL /* heap */,
         INVALID_DEVID);
@@ -1058,7 +1062,12 @@ static struct wc_rng_bank_inst *linuxkm_get_drbg(struct wc_rng_bank *ctx) {
         WC_RNG_BANK_FLAG_CAN_FAIL_OVER_INST |
         WC_RNG_BANK_FLAG_CAN_WAIT |
         WC_RNG_BANK_FLAG_PREFER_AFFINITY_INST |
-        WC_RNG_BANK_FLAG_NO_VECTOR_OPS;
+#if defined(WOLFSSL_USE_SAVE_VECTOR_REGISTERS) && !defined(WC_SVR_USE_NATIVE_REG_BUFS)
+        WC_RNG_BANK_FLAG_NO_VECTOR_OPS
+#else
+        WC_RNG_BANK_FLAG_NONE
+#endif
+        ;
 
     err = wc_rng_bank_checkout(ctx, &ret, 0, 30 /* timeout_secs */, flags);
 

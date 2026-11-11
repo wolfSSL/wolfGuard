@@ -10,6 +10,16 @@ ccflags-y += -D'pr_fmt(fmt)=KBUILD_MODNAME ": " fmt'
 ccflags-y += -Wframe-larger-than=2048
 # use dwarf 4 to avoid "Unsupported DW_TAG_atomic_type(0x47): type: 0x1ce18" on older kernels.
 ccflags-y += -gdwarf-4
+
+# setup_udp_tunnel_sock() and udp_tunnel_sock_release() moved to struct sock
+# in separate commits that distributions backport independently, so test each
+# for its original struct socket prototype (unchanged since 2014) and use the
+# struct sock form when it is absent.
+WG_UDP_TUNNEL_H := $(srctree)/include/net/udp_tunnel.h
+WG_SETUP_SK := $(shell grep -qs 'setup_udp_tunnel_sock.struct net .net, struct socket .sock' $(WG_UDP_TUNNEL_H) || echo y)
+WG_RELEASE_SK := $(shell grep -qs 'udp_tunnel_sock_release.struct socket .sock' $(WG_UDP_TUNNEL_H) || echo y)
+ccflags-$(WG_SETUP_SK) += -DWG_SETUP_UDP_TUNNEL_SOCK_SK
+ccflags-$(WG_RELEASE_SK) += -DWG_UDP_TUNNEL_SOCK_RELEASE_SK
 ccflags-$(if $(WOLFGUARD_VERSION),y,) += -D'WOLFGUARD_VERSION="$(WOLFGUARD_VERSION)"'
 
 wolfguard-y := main.o noise.o device.o peer.o timers.o queueing.o send.o receive.o socket.o peerlookup.o allowedips.o ratelimiter.o cookie.o netlink.o

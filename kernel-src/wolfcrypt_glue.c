@@ -6,7 +6,9 @@
 #include <crypto/scatterwalk.h>
 #include <linux/random.h>
 #include "wolfcrypt_glue.h"
-
+#ifdef WOLFSSL_LINUXKM_LKCAPI_HAVE_STDRNG
+    #include <crypto/internal/rng.h>
+#endif
 #if defined(WG_USE_PUBLIC_KEY_COMPRESSION) && !defined(HAVE_COMP_KEY)
 	#error WG_USE_PUBLIC_KEY_COMPRESSION requires HAVE_COMP_KEY
 #endif
@@ -971,7 +973,9 @@ int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx) {
 
     if (ret != 0)
         goto new_bank;
-#else /* !WC_RNG_BANK_DEFAULT_SUPPORT */
+    wc_wg_drbg_is_global_default = 1;
+    return 0;
+#elif defined(WOLFSSL_LINUXKM_LKCAPI_HAVE_STDRNG)
     struct crypto_rng *current_crypto_default_rng;
 
     ret = crypto_get_default_rng();
@@ -991,11 +995,11 @@ int wc_linuxkm_drbg_init_ctx(struct wc_rng_bank **ctx) {
     }
 
     *ctx = (struct wc_rng_bank *)crypto_rng_ctx(current_crypto_default_rng);
-#endif /* !WC_RNG_BANK_DEFAULT_SUPPORT */
-
     wc_wg_drbg_is_global_default = 1;
-
     return 0;
+#else /* !WC_RNG_BANK_DEFAULT_SUPPORT && !WOLFSSL_LINUXKM_LKCAPI_HAVE_STDRNG */
+    goto new_bank;
+#endif
 
 new_bank:
 

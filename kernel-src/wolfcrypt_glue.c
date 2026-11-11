@@ -5,7 +5,6 @@
 
 #include <crypto/scatterwalk.h>
 #include <linux/random.h>
-#include <crypto/internal/rng.h>
 #include "wolfcrypt_glue.h"
 
 #if defined(WG_USE_PUBLIC_KEY_COMPRESSION) && !defined(HAVE_COMP_KEY)

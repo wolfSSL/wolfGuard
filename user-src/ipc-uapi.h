@@ -152,10 +152,23 @@ static int userspace_set_device(struct wgdevice *dev)
 		goto out;
 	}
 
-	if (fscanf(f, "errno=%d\n\n", &ret) != 1)
-		ret = errno ? -errno : -EPROTO;
-	else
-		ret = -ret;
+	/* Read exactly the "errno=N" status line and its terminating blank line.
+	 * A trailing whitespace directive in fscanf() would keep reading until
+	 * EOF, and userspace implementations such as wolfguard-go keep the UAPI
+	 * connection open after replying, so that would block forever.
+	 */
+	{
+		char *line = NULL;
+		size_t line_len = 0;
+
+		if (getline(&line, &line_len, f) > 0 &&
+		    sscanf(line, "errno=%d", &ret) == 1) {
+			(void)getline(&line, &line_len, f);
+			ret = -ret;
+		} else
+			ret = errno ? -errno : -EPROTO;
+		free(line);
+	}
 
 out:
 

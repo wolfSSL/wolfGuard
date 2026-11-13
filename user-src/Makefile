@@ -63,7 +63,8 @@ ifdef NO_IPC_LLCRYPTO
 CFLAGS += -DNO_IPC_LLCRYPTO
 ifdef WOLFSSL_ROOT
 CFLAGS += -I$(WOLFSSL_ROOT)/include
-LDLIBS += -L$(WOLFSSL_ROOT)/lib -lwolfssl -Wl,-rpath=$(WOLFSSL_ROOT)/lib
+# libm and libpthread are needed when libwolfssl is a static library.
+LDLIBS += -L$(WOLFSSL_ROOT)/lib -lwolfssl -lm -lpthread -Wl,-rpath=$(WOLFSSL_ROOT)/lib
 else
 CFLAGS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --cflags wolfssl)
 LDLIBS += $(shell PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH} $(PKG_CONFIG) --libs wolfssl)
